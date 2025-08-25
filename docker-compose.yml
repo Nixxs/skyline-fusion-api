@@ -1,0 +1,15 @@
+services:
+  app:
+    container_name: skyline-fusion-api-app
+    build: .
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV_STATE=${ENV_STATE}
+      - FRONTEND_URL=${FRONTEND_URL}
+    depends_on:
+      db:
+        condition: service_started
+    volumes:
+      - .:/app
