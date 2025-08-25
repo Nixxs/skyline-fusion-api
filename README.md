@@ -56,13 +56,68 @@ Models are used when handling data that is going to and from the users of the AP
 
 ### Tests
 
-## Deploying to Azure
+## Deploying to IIS on a windows server
 
-There is a startup script already setup in this project called `startup.sh` you can use this as the startup command for an azure app service host environment. the .env example above also makes it easy for you to setup your environment variables the same way in the app service settings. Also make a FRONTEND_URL setting so your front end can get through CORS.
+1. install python on the windows server first for all users so its installed in program files
+2. copy the application into the server ie
+    ```
+    C:\apps\skyline-fusion-api\
+    .env
+    requirements.txt
+    main.py
+    api\...
+    logs\         (create)
+    ```
+3. from powershell navigate to the application directory, install the python virtual environment and python dependancies
+    ``` 
+    cd C:\apps\skyline-fusion-api
+    py -3.11 -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    # if not already pinned
+    pip install uvicorn[standard] fastapi asgi-correlation-id
+    ```
+4. Confirm it runs locally first using:
+    ```
+    .\.venv\Scripts\Activate.ps1
+    uvicorn main:app --host 127.0.0.1 --port 8000
+    ```
+5. next download a copy of the NSSM.exe from: `https://nssm.cc/download`
+6. now, run the commands below to create and start the fastapi application as as service:
+    ```
+    C:\apps\nssm\nssm.exe install SkylineFusionAPI "C:\apps\skyline-fusion-api\run-uvicorn.bat"
+    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppDirectory C:\apps\skyline-fusion-api
+    C:\apps\nssm\nssm.exe set SkylineFusionAPI Start SERVICE_AUTO_START
+    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppStdout C:\apps\skyline-fusion-api\logs\stdout.log
+    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppStderr C:\apps\skyline-fusion-api\logs\stderr.log
 
-1. have this project running locally in both local dev and azure, make sure all  your tests pass then push this into your github repo.
-2. Next, create an azure app service with webapp + database and link to this project via github - Azure will create the necessary pipeline file for github actions to use.
-3. setup the app service config with:
-    - environment variables (they should be the same as your .env but use the values of the database created with the app service app)
-    - startup.sh script start up command in the settings
-4. test the api works using the register user route
+    C:\apps\nssm\nssm.exe start SkylineFusionAPI
+    C:\apps\nssm\nssm.exe status SkylineFusionAPI
+    type C:\apps\skyline-fusion-api\logs\stderr.log
+    ```
+7. next we need to setup the reverse proxy so it runs through IIS via HTTPS and via the domain of you iis server first install the Application Request Routing from
+  - ARR Installer: `https://www.iis.net/downloads/microsoft/application-request-routing`
+8. create an iis application in IIS with:
+    - alias: skyline-fusion-api
+    - physical path: C:\apps\skyline-fusion-api
+9. make sure iis can read that folder so go in and set the security to grant access to IIS_IUSRS
+10. the correct web.config is already in this application repo so just use that but make sure its in that application folder.
+11. next in IIS click on the server node then: 
+    `Application Request Routing > server proxy settings > enable proxy`
+12. Go into the IIS Default Web Site > application URL rewrite and add the below server variables:
+    ```Default Web Site → URL Rewrite → View Server Variables → Add…
+    HTTP_X_FORWARDED_PROTO
+    HTTP_X_FORWARDED_HOST
+    HTTP_X_FORWARDED_FOR```
+13. next go into configuration Editor under default website and unlock:
+    - system.webServer/webSocket
+    - system.webServer/rewrite/rules
+    - system.webServer/rewrite/allowedServerVariables
+14. Now I had to also rebind the site to HTTPS
+    ```Site → Bindings…
+
+    HTTP 80: hostname skyline.ngis.com.au (or blank if catch-all)
+
+    HTTPS 443: hostname skyline.ngis.com.au, select the correct cert. probably wildcard 2025```
+15. now restart IIS and test it

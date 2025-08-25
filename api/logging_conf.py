@@ -6,7 +6,7 @@ from api.config import DevConfig, config
 
 def configure_logging() -> None:
     is_azure = os.getenv("WEBSITE_SITE_NAME") is not None  # Detect if running in Azure App Service
-    log_dir = "/home/logs" if is_azure else "."  # Use /home/logs in Azure
+    log_dir = "/home/logs" if is_azure else "./logs"  # Use /home/logs in Azure
 
     os.makedirs(log_dir, exist_ok=True)  # Ensure directory exists
 
