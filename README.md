@@ -81,20 +81,20 @@ Models are used when handling data that is going to and from the users of the AP
 4. Confirm it runs locally first using:
     ```
     .\.venv\Scripts\Activate.ps1
-    uvicorn main:app --host 127.0.0.1 --port 8000
+    uvicorn api.main:app --host 127.0.0.1 --port 8000
     ```
 5. next download a copy of the NSSM.exe from: `https://nssm.cc/download`
 6. now, run the commands below to create and start the fastapi application as as service:
     ```
-    C:\apps\nssm\nssm.exe install SkylineFusionAPI "C:\apps\skyline-fusion-api\run-uvicorn.bat"
-    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppDirectory C:\apps\skyline-fusion-api
-    C:\apps\nssm\nssm.exe set SkylineFusionAPI Start SERVICE_AUTO_START
-    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppStdout C:\apps\skyline-fusion-api\logs\stdout.log
-    C:\apps\nssm\nssm.exe set SkylineFusionAPI AppStderr C:\apps\skyline-fusion-api\logs\stderr.log
+    D:\apps\nssm\nssm.exe install SkylineFusionAPI "D:\apps\skyline-fusion-api\run-uvicorn.bat"
+    D:\apps\nssm\nssm.exe set SkylineFusionAPI AppDirectory D:\apps\skyline-fusion-api
+    D:\apps\nssm\nssm.exe set SkylineFusionAPI Start SERVICE_AUTO_START
+    D:\apps\nssm\nssm.exe set SkylineFusionAPI AppStdout D:\apps\skyline-fusion-api\logs\stdout.log
+    D:\apps\nssm\nssm.exe set SkylineFusionAPI AppStderr D:\apps\skyline-fusion-api\logs\stderr.log
 
-    C:\apps\nssm\nssm.exe start SkylineFusionAPI
-    C:\apps\nssm\nssm.exe status SkylineFusionAPI
-    type C:\apps\skyline-fusion-api\logs\stderr.log
+    D:\apps\nssm\nssm.exe start SkylineFusionAPI
+    D:\apps\nssm\nssm.exe status SkylineFusionAPI
+    type D:\apps\skyline-fusion-api\logs\stderr.log
     ```
 7. next we need to setup the reverse proxy so it runs through IIS via HTTPS and via the domain of you iis server first install the Application Request Routing from
   - ARR Installer: `https://www.iis.net/downloads/microsoft/application-request-routing`
