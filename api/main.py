@@ -50,10 +50,11 @@ This API underpins the operational workflow for field survey imagery management,
         "name": "Nicholas Chai",
         "email": "nicholasc@ngis.com.au",
     },
+    docs_url=f"{config.API_PREFIX}/docs",
+    redoc_url=f"{config.API_PREFIX}/redoc",
+    openapi_url=f"{config.API_PREFIX}/openapi.json",
     lifespan=lifespan
 )
-
-
 
 # Enable CORS
 app.add_middleware(
