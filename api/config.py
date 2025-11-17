@@ -12,7 +12,6 @@ class GlobalConfig(BaseConfig):
     FRONTEND_URL: str
     DATABASE_PATH: str
     DATA_PATH: str
-    API_PREFIX: str = "/skyline-fusion-api"
     model_config = SettingsConfigDict(env_prefix="")
 
     @property

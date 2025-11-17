@@ -168,7 +168,7 @@ async def create_image(
         file_path=file_path,
     )
 
-@router.get("/{image_id}", status_code=200)
+@router.get("/images/{image_id}", status_code=200)
 def get_image_by_id(image_id: int, db: Session = Depends(get_db)):
     image = db.query(Image).filter(Image.image_id == image_id).first()
     if not image:
