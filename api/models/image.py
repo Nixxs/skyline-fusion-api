@@ -7,4 +7,4 @@ class ImageCreate(BaseModel):
     lat: Optional[float] = None
     alt_m: Optional[float] = None
     yaw_deg: Optional[float] = None
-    url: str
+    url: Optional[str] = None  # optional, we may overwrite with file_path/GCS later

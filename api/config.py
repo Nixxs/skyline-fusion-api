@@ -11,6 +11,7 @@ class BaseConfig(BaseSettings):
 class GlobalConfig(BaseConfig):
     FRONTEND_URL: str
     DATABASE_PATH: str
+    DATA_PATH: str
     model_config = SettingsConfigDict(env_prefix="")
 
     @property
