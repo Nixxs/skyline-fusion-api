@@ -30,7 +30,30 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("API shutdown complete")
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Skyline Fusion API - Heathgate Edition",
+    version="1.0.0",
+    description="""
+This API provides the backend services for the Drone Image Viewer platform used to ingest, catalogue, classify, and visualise aerial imagery captured across the Heathgate region. It supports the upload of drone imagery (JPEG/PNG), automatic extraction of geospatial EXIF metadata, and storage of image records and associated properties within the system database.
+
+Key capabilities include:
+• Secure image upload with validation and automated file-system storage.
+• Extraction of GPS latitude/longitude, altitude, heading/yaw, and timestamp metadata.
+• Persistent indexing of image records for search, filtering, and spatial queries.
+• Integration with the Skyline Fusion Viewer for spatial display of drone imagery on map layers.
+• Support for custom attributes such as image classification, survey campaign, and operational context.
+• RESTful endpoints for listing, retrieving, and managing stored images.
+
+This API underpins the operational workflow for field survey imagery management, enabling rapid QA, spatial review, and streamlined access to critical geospatial photo evidence.
+    """,
+    contact={
+        "name": "Nicholas Chai",
+        "email": "nicholasc@ngis.com.au",
+    },
+    lifespan=lifespan
+)
+
+
 
 # Enable CORS
 app.add_middleware(
