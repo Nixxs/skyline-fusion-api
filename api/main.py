@@ -7,8 +7,11 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware  # Import CORS middleware
 
 from api.routers.helloworld import router as user_router
+from api.routers.images import router as image_router
+
 from api.config import config
 from api.logging_conf import configure_logging
+from api.db.init_db import init_db
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +24,11 @@ origins = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    logger.info("Starting api")
+    logger.info("Starting API")
+    logger.info(f"Database URL: {config.SQLALCHEMY_DATABASE_URL}")
+    init_db()
     yield
+    logger.info("API shutdown complete")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -39,6 +45,7 @@ app.add_middleware(CorrelationIdMiddleware)
 
 # Include routers
 app.include_router(user_router)
+app.include_router(image_router)
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler_logging(request, exc):
