@@ -27,3 +27,10 @@ def create_image(payload: ImageCreate, db: Session = Depends(get_db)):
     db.refresh(image)  # reload with assigned ID
 
     return {"status": "ok", "image": image}
+
+@router.get("/{image_id}", status_code=200)
+def get_image_by_id(image_id: int, db: Session = Depends(get_db)):
+    image = db.query(Image).filter(Image.image_id == image_id).first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return image
