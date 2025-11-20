@@ -73,3 +73,4 @@ Thumbs.db
 data/db/heathgate.sqlite-wal
 data/db/heathgate.sqlite-shm
 data/
+service-account.json

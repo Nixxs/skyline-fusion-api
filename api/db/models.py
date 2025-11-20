@@ -13,7 +13,7 @@ class Image(Base):
     alt_m = Column(Float)
     yaw_deg = Column(Float)
     created = Column(DateTime)
-    url = Column(Text, nullable=False)
+    object_name = Column(String, nullable=False)
     imported_utc = Column(Text, nullable=False)
 
     # relationships

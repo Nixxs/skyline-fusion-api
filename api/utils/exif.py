@@ -28,4 +28,4 @@ def extract_exif_geo(file_path: str) -> Tuple[Optional[float], Optional[float], 
     except Exception as e:
         # If anything goes wrong, fail soft
         logger.warning(f"Failed to extract EXIF from {file_path}: {e}")
-        return None, None, None, None, None
+        return None, None, None, None, None, None

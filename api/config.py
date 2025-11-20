@@ -13,6 +13,10 @@ class GlobalConfig(BaseConfig):
     DATABASE_PATH: str
     DATA_PATH: str
     EXIF_TOOL_PATH: str
+
+    GCS_IMAGES_BUCKET: str
+    GCS_SERVICE_ACCOUNT_FILE: str
+
     model_config = SettingsConfigDict(env_prefix="")
 
     @property
@@ -25,6 +29,7 @@ class GlobalConfig(BaseConfig):
         super().__init__(**values)
 
 class DevConfig(GlobalConfig):
+    DATABASE_PATH: str = r"D:\apps\skyline-fusion-api\data\db\hg_drone_image_viewer_dev.sqlite"
     pass
 
 class TestConfig(GlobalConfig):
