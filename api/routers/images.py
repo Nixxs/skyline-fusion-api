@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from api.db.session import get_db
 from api.db.models import Image
-from api.models.image import ImageCreate
 from api.utils.file_handler import save_image_file
 from api.utils.exif import extract_exif_geo
 import datetime as dt
@@ -25,6 +24,7 @@ class ImageOut(BaseModel):
     lat: float | None = None
     alt_m: float | None = None
     yaw_deg: float | None = None
+    created: dt.datetime | None = None
     url: str
     class_id: int | None = None
     imported_utc: str
@@ -80,20 +80,6 @@ async def create_image(
         ...,
         description="The drone image file to upload (e.g. JPEG with EXIF GPS data).",
     ),
-    meta: str = Form(
-        ...,
-        description=(
-            "JSON string containing image metadata. Example:\n"
-            '{\n'
-            '  "name": "2025-08-27--12-55-33-SG-006614-SCPP-Inspection.jpeg",\n'
-            '  "lon": null,\n'
-            '  "lat": null,\n'
-            '  "alt_m": null,\n'
-            '  "yaw_deg": null,\n'
-            '  "url": null\n'
-            '}'
-        ),
-    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -103,27 +89,14 @@ async def create_image(
     **Request format (multipart/form-data)**
 
     - `file`: binary image file (e.g. JPEG from the drone)
-    - `meta`: JSON string with fields:
-        - `name` (str): logical image name (usually original filename)
-        - `lon` (float, optional): longitude override; if null, EXIF is used
-        - `lat` (float, optional): latitude override; if null, EXIF is used
-        - `alt_m` (float, optional): altitude override; if null, EXIF is used
-        - `yaw_deg` (float, optional): yaw/heading override; if null, EXIF (if present) is used
-        - `url` (str, optional): external URL; if null, the local file path is used
 
     **Behaviour**
 
     1. The uploaded file is written under the configured data path (e.g. `data/images/`).
     2. EXIF GPS metadata is read from the saved file.
-    3. Explicit values from `meta` override EXIF values where provided.
-    4. A row is inserted into `images`.
-    5. The created record and file path are returned.
+    3. A row is inserted into `images`.
+    4. The created record and file path are returned.
     """
-    # Parse meta JSON into Pydantic model
-    try:
-        image_meta = ImageCreate.model_validate_json(meta)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid meta JSON: {e}")
 
     imported = dt.datetime.now(dt.timezone.utc).isoformat()
 
@@ -132,29 +105,23 @@ async def create_image(
     logger.info(f"Saved uploaded image to {file_path}")
 
     # Extract EXIF geo info
-    exif_lon, exif_lat, exif_alt, exif_yaw = extract_exif_geo(file_path)
+    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created = extract_exif_geo(file_path)
     logger.info(
         f"EXIF for {file.filename}: "
         f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
     )
 
-    # Merge: explicit meta wins, EXIF fills gaps
-    lon = image_meta.lon if image_meta.lon is not None else exif_lon
-    lat = image_meta.lat if image_meta.lat is not None else exif_lat
-    alt_m = image_meta.alt_m if image_meta.alt_m is not None else exif_alt
-    yaw_deg = image_meta.yaw_deg if image_meta.yaw_deg is not None else exif_yaw
-
     # Decide URL: later this will be a GCS URL; for now we use meta.url or local path
-    final_url = image_meta.url or file_path
+    final_url = None or file_path
 
     image = Image(
-        name=image_meta.name,
-        lon=lon,
-        lat=lat,
-        alt_m=alt_m,
-        yaw_deg=yaw_deg,
+        name=exif_name,
+        lon=exif_lon,
+        lat=exif_lat,
+        alt_m=exif_alt,
+        yaw_deg=exif_yaw,
+        created=created,
         url=final_url,
-        class_id=None,
         imported_utc=imported,
     )
 

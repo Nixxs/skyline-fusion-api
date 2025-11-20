@@ -1,5 +1,5 @@
 # api/db/models.py
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from api.db.session import Base
 
@@ -12,8 +12,8 @@ class Image(Base):
     lat = Column(Float)
     alt_m = Column(Float)
     yaw_deg = Column(Float)
+    created = Column(DateTime)
     url = Column(Text, nullable=False)
-    class_id = Column(String, index=True)  # denormalised convenience
     imported_utc = Column(Text, nullable=False)
 
     # relationships
