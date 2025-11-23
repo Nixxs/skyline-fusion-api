@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && copy web.config dist\\web.config",
     "lint": "eslint .",
     "preview": "vite preview"
   },
