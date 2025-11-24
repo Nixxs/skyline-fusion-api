@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def init_db():
     # Enable foreign_keys and WAL for SQLite
-    if config.SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    if config.SQLALCHEMY_DATABASE_URL.startswith("gpkg"):
         with engine.connect() as conn:
             conn.execute(text("PRAGMA journal_mode=WAL;"))
             conn.execute(text("PRAGMA foreign_keys=ON;"))

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from api.db.session import get_db
 from api.db.models import Image
@@ -6,8 +6,11 @@ from api.utils.file_handler import save_image_file
 from api.utils.exif import extract_exif_geo
 import datetime as dt
 import logging
+import uuid
 from pydantic import BaseModel, ConfigDict
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point 
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +22,7 @@ router = APIRouter()
 # -----------------------------
 
 class GetImageOut(BaseModel):
-    image_id: int
+    image_id: str
     name: str
     lon: float | None = None
     lat: float | None = None
@@ -34,7 +37,7 @@ class GetImageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class BaseImage(BaseModel):
-    image_id: int
+    image_id: str
     name: str
     lon: float | None = None
     lat: float | None = None
@@ -120,7 +123,7 @@ async def create_image(
     logger.info(f"Saved uploaded image to {file_path}")
 
     # Extract EXIF geo info
-    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created = extract_exif_geo(file_path)
+    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom = extract_exif_geo(file_path)
     logger.info(
         f"EXIF for {file.filename}: "
         f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
@@ -130,6 +133,7 @@ async def create_image(
     object_name = handle_gcs_image_upload(file_path)
 
     image = Image(
+        image_id=str(uuid.uuid4()),
         name=exif_name,
         lon=exif_lon,
         lat=exif_lat,
@@ -138,6 +142,7 @@ async def create_image(
         created=created,
         object_name=object_name,
         imported_utc=imported,
+        geom=geom
     )
 
     db.add(image)
@@ -151,13 +156,13 @@ async def create_image(
     )
 
 @router.get("/images/{image_id}", status_code=200, response_model=GetImageOut)
-def get_image_by_id(image_id: int, db: Session = Depends(get_db)):
+def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     image = db.query(Image).filter(Image.image_id == image_id).first()
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
 
     # Generate a signed URL valid for 1 hour (3600 seconds)
-    signed_url = generate_signed_url(image.object_name, expires_in_seconds=3600)
+    signed_url = generate_signed_url(str(image.object_name), expires_in_seconds=3600)
 
     # Use from_attributes + update to avoid manually copying every field
     image_out = BaseImage.model_validate(image)

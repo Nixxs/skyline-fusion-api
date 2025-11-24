@@ -15,3 +15,5 @@ passlib[bcrypt]
 sqlalchemy
 pyexiftool
 google-cloud-storage
+geoalchemy2
+shapely
