@@ -7,7 +7,8 @@ from geoalchemy2 import Geometry
 class Image(Base):
     __tablename__ = "images"
 
-    image_id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
+    image_id = Column(Text, nullable=False, unique=True)
     name = Column(Text, nullable=False)
     lon = Column(Float)
     lat = Column(Float)
@@ -24,7 +25,8 @@ class Image(Base):
 class ImageClass(Base):
     __tablename__ = "image_classes"
 
-    class_id = Column(String, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
+    class_id = Column(Text, unique=True, nullable=False)
     name = Column(Text)
     lon = Column(Float, nullable=False)
     lat = Column(Float, nullable=False)
