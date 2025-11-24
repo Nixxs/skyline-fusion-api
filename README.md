@@ -59,6 +59,14 @@ Models are used when handling data that is going to and from the users of the AP
 ## Deploying to IIS on a windows server
 
 1. install python on the windows server first for all users so its installed in program files
+
+
+2. Install OSGeo4W: https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe 
+   The database connection requires it for spatial data handling
+
+   Set an environment variable for: `SPATIALITE_LIBRARY_PATH=C:\OSGeo4W\bin\mod_spatialite.dll`
+   Add the bin to your windows system PATH: `C:\OSGeo4W\bin` 
+
 2. copy the application into the server ie
     ```
     C:\apps\skyline-fusion-api\

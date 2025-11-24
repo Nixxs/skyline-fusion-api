@@ -2,6 +2,7 @@
 from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from api.db.session import Base
+from geoalchemy2 import Geometry
 
 class Image(Base):
     __tablename__ = "images"
@@ -15,6 +16,7 @@ class Image(Base):
     created = Column(DateTime)
     object_name = Column(String, nullable=False)
     imported_utc = Column(Text, nullable=False)
+    geom = Column(Geometry(geometry_type="POINT", srid=4326))
 
     # relationships
     classes = relationship("ImageLookup", back_populates="image")
@@ -30,6 +32,7 @@ class ImageClass(Base):
     yaw_deg = Column(Float)
     image_count = Column(Integer, nullable=False, default=0)
     updated_utc = Column(Text)
+    geom = Column(Geometry(geometry_type="POINT", srid=4326))
 
     images = relationship("ImageLookup", back_populates="image_class")
 

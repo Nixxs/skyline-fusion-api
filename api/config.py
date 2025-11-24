@@ -23,13 +23,12 @@ class GlobalConfig(BaseConfig):
     def SQLALCHEMY_DATABASE_URL(self) -> str:
         # Ensure absolute path for SQLite
         path = Path(self.DATABASE_PATH).resolve()
-        return f"sqlite:///{path}"
+        return f"gpkg:///{path}"
 
     def __init__(self, **values):
         super().__init__(**values)
 
 class DevConfig(GlobalConfig):
-    DATABASE_PATH: str = r"D:\apps\skyline-fusion-api\data\db\hg_drone_image_viewer_dev.sqlite"
     pass
 
 class TestConfig(GlobalConfig):

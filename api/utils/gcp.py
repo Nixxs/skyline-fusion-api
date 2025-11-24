@@ -28,11 +28,10 @@ def upload_image_to_gcs(local_path: str, dest_blob_name: str) -> str:
 
     blob.upload_from_filename(local_path)
 
-    # Optional: content type
-    # blob.content_type = "image/jpeg"
-    # blob.patch()
-
-    return blob.name
+    if blob:
+        return str(blob.name)
+    else:
+        raise ValueError("Unable to upload image")
 
 
 def generate_signed_url(dest_blob_name: str, expires_in_seconds: int = 3600) -> str:

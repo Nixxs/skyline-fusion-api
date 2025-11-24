@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # CORS settings
 origins = [
     config.FRONTEND_URL,  # Add production frontend domain at some point
+    "http://localhost:8080"
 ]
 
 @asynccontextmanager
