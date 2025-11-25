@@ -13,6 +13,8 @@ from api.config import config
 from api.logging_conf import configure_logging
 from api.db.init_db import init_db
 
+from api.utils.gcp import ensure_bucket_cors
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,13 @@ async def lifespan(app: FastAPI):
     logger.info("Starting API")
     logger.info(f"Database URL: {config.SQLALCHEMY_DATABASE_URL}")
     init_db()
+    ensure_bucket_cors(
+        extra_origins=[
+            "http://localhost:8080",
+            "http://localhost:5173",
+        ]
+    )
+
     yield
     logger.info("API shutdown complete")
 

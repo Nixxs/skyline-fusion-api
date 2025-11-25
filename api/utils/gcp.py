@@ -1,10 +1,14 @@
 # api/utils/gcs.py
 
 import os
+from urllib.parse import urlparse
 from datetime import timedelta
 from google.cloud import storage
 from api.config import config
 import pathlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_storage_client() -> storage.Client:
     """
@@ -60,3 +64,71 @@ def handle_gcs_image_upload(local_path: str) -> str:
     object_name = upload_image_to_gcs(local_path, dest_blob_name)
 
     return object_name
+
+def _origin_from_url(url: str) -> str:
+    """
+    Extracts scheme://host[:port] from a full URL, e.g.
+    'https://heathgate.ngis.com.au/drone-image-viewer' -> 'https://heathgate.ngis.com.au'
+    """
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+def ensure_bucket_cors(extra_origins: list[str] | None = None) -> None:
+    """
+    Ensures the GCS bucket used for images has the expected CORS configuration.
+    Only updates the bucket if the current CORS config differs from the desired one.
+
+    This should be safe to call on every application startup.
+    """
+    client: storage.Client = get_storage_client()
+    bucket = client.bucket(config.GCS_IMAGES_BUCKET)
+
+    # Build the list of allowed origins
+    origins: list[str] = []
+
+    # Frontend URL from config (prod/dev)
+    if config.FRONTEND_URL:
+        origins.append(_origin_from_url(config.FRONTEND_URL))
+
+    # Any extra origins (e.g. localhost, additional environments)
+    if extra_origins:
+        origins.extend(extra_origins)
+
+    # De-duplicate while preserving order
+    seen = set()
+    unique_origins: list[str] = []
+    for o in origins:
+        if o and o not in seen:
+            seen.add(o)
+            unique_origins.append(o)
+
+    if not unique_origins:
+        logger.warning("No origins configured for GCS CORS; skipping CORS setup.")
+        return
+
+    desired_cors = [
+        {
+            "origin": unique_origins,
+            "method": ["GET", "HEAD", "OPTIONS"],
+            "responseHeader": ["Content-Type"],
+            "maxAgeSeconds": 3600,
+        }
+    ]
+
+    current_cors = bucket.cors or []
+
+    if current_cors == desired_cors:
+        logger.info(
+            "GCS bucket %s already has desired CORS configuration; no update needed.",
+            bucket.name,
+        )
+        return
+
+    logger.info(
+        "Updating CORS configuration on GCS bucket %s. Origins: %s",
+        bucket.name,
+        ", ".join(unique_origins),
+    )
+    bucket.cors = desired_cors
+    bucket.patch()
+    logger.info("CORS configuration updated on bucket %s", bucket.name)
