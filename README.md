@@ -65,9 +65,34 @@ Models are used when handling data that is going to and from the users of the AP
    The database connection requires it for spatial data handling
 
    Set an environment variable for: `SPATIALITE_LIBRARY_PATH=C:\OSGeo4W\bin\mod_spatialite.dll`
-   Add the bin to your windows system PATH: `C:\OSGeo4W\bin` 
+   Add the bin to your windows system PATH: `C:\OSGeo4W\bin`
 
-2. copy the application into the server ie
+3. GCP Buckets
+   This application also needs to use a GCP storage bucket when you setup the ENV file for the project you must cofig a GCS_IMAGES_BUCKET and GCS_SERVICE_ACCOUNT_FILE the service account file is created in GCP IAM when you make a new service account the json file can be generated there then you must give that service account STORAGE ADMIN role so it can manage the buckets for image storage. While you are there should can also create a bucket for the app to use then set your GCS_IMAGES_BUCKET value to the name of that bucket. 
+
+4. Exiftool
+   This application uses exiftool to properly extract exif data from image files you must get this from here:
+   `https://exiftool.org/`
+   then set your .env EXIF_TOOL_PATH to the exiftool.exe file that you downloaded
+
+5. env file
+   your .env file should live in the root of the project and look something like this now:
+```
+```
+   ```
+      FRONTEND_URL=https://heathgate.ngis.com.au
+      ENV_STATE=global
+      DATABASE_PATH=D:\apps\skyline-fusion-api\data\db\hgr_drone_image_db_dev.gpkg
+      DATA_PATH=D:\apps\skyline-fusion-api\data
+      EXIF_TOOL_PATH=D:\apps\exiftool\exiftool.exe
+
+      GCS_IMAGES_BUCKET=heathgate-drone-images-dev
+      GCS_SERVICE_ACCOUNT_FILE=D:\apps\skyline-fusion-api\service-account.json
+   ```
+   ```
+   ```
+
+6. copy the application into the server ie
     ```
     C:\apps\skyline-fusion-api\
     .env
@@ -76,7 +101,8 @@ Models are used when handling data that is going to and from the users of the AP
     api\...
     logs\         (create)
     ```
-3. from powershell navigate to the application directory, install the python virtual environment and python dependancies
+
+7. from powershell navigate to the application directory, install the python virtual environment and python dependancies
     ``` 
     cd C:\apps\skyline-fusion-api
     py -3.11 -m venv .venv
@@ -86,13 +112,13 @@ Models are used when handling data that is going to and from the users of the AP
     # if not already pinned
     pip install uvicorn[standard] fastapi asgi-correlation-id
     ```
-4. Confirm it runs locally first using:
+8. Confirm it runs locally first using:
     ```
     .\.venv\Scripts\Activate.ps1
     uvicorn api.main:app --host 127.0.0.1 --port 8000
     ```
-5. next download a copy of the NSSM.exe from: `https://nssm.cc/download`
-6. now, run the commands below to create and start the fastapi application as as service:
+9. next download a copy of the NSSM.exe from: `https://nssm.cc/download`
+10. now, run the commands below to create and start the fastapi application as as service:
     ```
     D:\apps\nssm\nssm.exe install SkylineFusionAPI "D:\apps\skyline-fusion-api\run-uvicorn.bat"
     D:\apps\nssm\nssm.exe set SkylineFusionAPI AppDirectory D:\apps\skyline-fusion-api
@@ -104,28 +130,28 @@ Models are used when handling data that is going to and from the users of the AP
     D:\apps\nssm\nssm.exe status SkylineFusionAPI
     type D:\apps\skyline-fusion-api\logs\stderr.log
     ```
-7. next we need to setup the reverse proxy so it runs through IIS via HTTPS and via the domain of you iis server first install the Application Request Routing from
+11. next we need to setup the reverse proxy so it runs through IIS via HTTPS and via the domain of you iis server first install the Application Request Routing from
   - ARR Installer: `https://www.iis.net/downloads/microsoft/application-request-routing`
-8. create an iis application in IIS with:
+12. create an iis application in IIS with:
     - alias: skyline-fusion-api
     - physical path: C:\apps\skyline-fusion-api
-9. make sure iis can read that folder so go in and set the security to grant access to IIS_IUSRS
-10. the correct web.config is already in this application repo so just use that but make sure its in that application folder.
-11. next in IIS click on the server node then: 
+13. make sure iis can read that folder so go in and set the security to grant access to IIS_IUSRS
+14. the correct web.config is already in this application repo so just use that but make sure its in that application folder.
+15. next in IIS click on the server node then: 
     `Application Request Routing > server proxy settings > enable proxy`
-12. Go into the IIS Default Web Site > application URL rewrite and add the below server variables:
+16. Go into the IIS Default Web Site > application URL rewrite and add the below server variables:
     ```Default Web Site → URL Rewrite → View Server Variables → Add…
     HTTP_X_FORWARDED_PROTO
     HTTP_X_FORWARDED_HOST
     HTTP_X_FORWARDED_FOR```
-13. next go into configuration Editor under default website and unlock:
+17. next go into configuration Editor under default website and unlock:
     - system.webServer/webSocket
     - system.webServer/rewrite/rules
     - system.webServer/rewrite/allowedServerVariables
-14. Now I had to also rebind the site to HTTPS
+18. Now I had to also rebind the site to HTTPS
     ```Site → Bindings…
 
     HTTP 80: hostname skyline.ngis.com.au (or blank if catch-all)
 
     HTTPS 443: hostname skyline.ngis.com.au, select the correct cert. probably wildcard 2025```
-15. now restart IIS and test it
+19. now restart IIS and test it

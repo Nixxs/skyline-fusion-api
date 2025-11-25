@@ -9,8 +9,6 @@ import logging
 import uuid
 from pydantic import BaseModel, ConfigDict
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
-from geoalchemy2.shape import from_shape
-from shapely.geometry import Point 
 
 logger = logging.getLogger(__name__)
 
