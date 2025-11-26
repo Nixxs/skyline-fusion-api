@@ -338,3 +338,9 @@ def cluster_images_endpoint(
         images_clustered=images_clustered,
         unclustered_images=unclustered_images,
     )
+
+
+#TODO: Route to get all images in a given cluster id 
+# /images/cluster/{cluster_id}
+# This would use the image look up table to find the list of image_id assocaited with the cluster
+# Then retrieve and return the list of Image objects to the caller 
