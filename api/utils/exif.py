@@ -6,7 +6,7 @@ from datetime import datetime
 from api.config import config
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from geoalchemy2 import Geometry, WKBElement
+from geoalchemy2 import WKBElement
 
 logger = logging.getLogger(__name__)
 
