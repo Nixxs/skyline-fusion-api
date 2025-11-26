@@ -57,11 +57,23 @@ def generate_signed_url(dest_blob_name: str, expires_in_seconds: int = 3600) -> 
 def handle_gcs_image_upload(local_path: str) -> str:
     """
     Uploads the image at local_path to GCS under 'images/{filename_only}',
-    and returns a signed URL valid for 1 hour.
+    returns the GCS object_name, and deletes the local file afterwards.
     """
     filename_only = pathlib.Path(local_path).name
     dest_blob_name = f"images/{filename_only}"
-    object_name = upload_image_to_gcs(local_path, dest_blob_name)
+
+    try:
+        object_name = upload_image_to_gcs(local_path, dest_blob_name)
+    except Exception as e:
+        logger.exception(f"Failed uploading {local_path} to GCS: {e}")
+        raise
+
+    # Remove the file after successful upload
+    try:
+        os.remove(local_path)
+        logger.info(f"Deleted temp file {local_path}")
+    except Exception as e:
+        logger.warning(f"Failed to delete temp file {local_path}: {e}")
 
     return object_name
 

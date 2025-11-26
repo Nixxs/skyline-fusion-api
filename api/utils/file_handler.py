@@ -33,7 +33,7 @@ def safe_filename(filename: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", name)
 
 
-async def save_image_file(input_file: UploadFile, subfolder: str = "images") -> str:
+async def save_file(input_file: UploadFile, subfolder: str = "images") -> str:
     """
     Save an uploaded file under config.DATA_PATH / subfolder and return the full path.
     """
