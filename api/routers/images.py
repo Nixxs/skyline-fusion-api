@@ -273,7 +273,7 @@ def cluster_images_endpoint(
         db.commit()
 
     # 3. Cluster in memory
-    clusters = cluster_images_by_distance(images, params.max_distance_m)
+    clusters = cluster_images_by_distance(images, params.max_distance_m, params.max_yaw_diff_deg)
 
     # 4. Create ImageClass & ImageLookup rows
     now_utc = dt.datetime.now(dt.timezone.utc).isoformat()
