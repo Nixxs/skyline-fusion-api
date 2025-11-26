@@ -8,6 +8,7 @@ import datetime as dt
 import logging
 import uuid
 import zipfile
+import os
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
@@ -299,6 +300,9 @@ async def create_images(
         db.commit()
         for img in created_images:
             db.refresh(img)
+
+        os.rmdir(extract_dir)
+        os.remove(zip_path)
 
         return CreateImagesOut(
             status="ok",
