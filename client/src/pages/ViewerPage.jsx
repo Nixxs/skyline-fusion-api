@@ -4,12 +4,13 @@ import axios from "axios";
 
 function ViewerPage() {
   const { id } = useParams()
-  const [imageUrl, setImageUrl] = useState([])
+  const [imageUrl, setImageUrl] = useState("")
+  const [loading, setLoading] = useState(true);
 
   const getImageUrl = async (image_id) => {
     try {
       const response = await axios.get(
-        `https://heathgate.ngis.com.au/skyline-fusion-api/images/${image_id}`,
+        `${import.meta.env.VITE_API_URL}/image/${image_id}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -23,6 +24,8 @@ function ViewerPage() {
       }
     } catch (error) {
       console.log(error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -34,13 +37,18 @@ function ViewerPage() {
     <div style={{ padding: '1.5rem' }}>
       <h1>Viewer</h1>
       <p>Showing viewer for project/image ID: {imageUrl}</p>
-      <img
-        src={imageUrl}
-        alt="drone image from google cloud storage"
-        width={400}
-        loading="lazy"
-        crossOrigin="anonymous"
-      />
+
+      {loading && <p>Loading...</p>}
+
+      {!loading && imageUrl && (
+        <img
+          src={imageUrl}
+          alt="drone image from google cloud storage"
+          width={400}
+          loading="lazy"
+          crossOrigin="anonymous"
+        />
+      )}
     </div>
   )
 }
