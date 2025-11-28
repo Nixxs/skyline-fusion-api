@@ -1,14 +1,16 @@
-import { Routes, Route, useParams } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
-import ViewerPage from './pages/ViewerPage.jsx'
+import ImageViewerPage from './pages/ImageViewerPage.jsx'
+import ClusterViewerPage from './pages/ClusterViewerPage.jsx'
 
 function App() {
   return (
     <div>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/viewer/:id" element={<ViewerPage />} />
+        <Route path="/image/:id" element={<ImageViewerPage />} />
+        <Route path="/cluster/:cluster_id" element={<ClusterViewerPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
