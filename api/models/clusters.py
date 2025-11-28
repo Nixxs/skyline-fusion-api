@@ -1,4 +1,6 @@
-from pydantic import BaseModel 
+from pydantic import BaseModel
+from typing import List
+from api.models.images import GetImageOut
 
 
 class ClusterRequest(BaseModel):
@@ -13,3 +15,6 @@ class ClusterSummary(BaseModel):
     images_clustered: int
     unclustered_images: int
 
+class ClusterOut(BaseModel):
+    cluster_id: str
+    images: List[GetImageOut]

@@ -3,7 +3,7 @@ import logging
 import uuid
 import zipfile
 import os
-from typing import cast
+from typing import cast, List
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
@@ -17,7 +17,7 @@ from pathlib import Path
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
 from api.utils.image_classification import cluster_images_by_distance
 from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage
-from api.models.clusters import ClusterRequest, ClusterSummary
+from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +340,53 @@ def cluster_images_endpoint(
     )
 
 
-#TODO: Route to get all images in a given cluster id 
-# /images/cluster/{cluster_id}
-# This would use the image look up table to find the list of image_id assocaited with the cluster
-# Then retrieve and return the list of Image objects to the caller 
+@router.get(
+    "/images/cluster/{cluster_id}",
+    status_code=200,
+    response_model=ClusterOut,
+    tags=["image", "cluster"],
+    summary="All the images from a given cluster_id",
+    description=(
+        "retrieves all the images from a given cluster id using th and returns them using the "
+    ),
+)
+def get_cluster_by_id(cluster_id: str, db: Session = Depends(get_db)):
+    image_lookup_rows: List[ImageLookup] = (
+        db.query(ImageLookup)
+        .filter(ImageLookup.class_id == cluster_id)
+        .all()
+    )
+
+    if not image_lookup_rows:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    # Use the relationship to get Image objects
+    images_out: List[GetImageOut] = []
+
+    for row in image_lookup_rows:
+        image = row.image
+        if image is None:
+            continue
+
+        signed_url = generate_signed_url(str(image.object_name), expires_in_seconds=3600)
+        
+        images_out.append(
+            GetImageOut(
+                image_id=image.image_id,
+                name=image.name,
+                lon=image.lon,
+                lat=image.lat,
+                alt_m=image.alt_m,
+                yaw_deg=image.yaw_deg,
+                created=image.created,
+                signed_url=signed_url,
+                object_name=image.object_name,
+                imported_utc=image.imported_utc,
+            )
+        )
+
+    return ClusterOut(
+        cluster_id=cluster_id,
+        images=images_out
+    )
+
