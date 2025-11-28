@@ -1,120 +1,28 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
-from api.db.session import get_db
-from api.db.models import Image
-from api.utils.file_handler import save_file
-from api.utils.exif import extract_exif_geo
 import datetime as dt
 import logging
 import uuid
 import zipfile
 import os
+from typing import cast, List
+from geoalchemy2 import WKBElement
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from sqlalchemy.orm import Session
+from api.db.session import get_db
+from api.db.models import Image, ImageClass, ImageLookup
+from api.utils.file_handler import save_file
+from api.utils.exif import extract_exif_geo
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
-from typing import List
+from api.utils.image_classification import cluster_images_by_distance
+from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage
+from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-# -----------------------------
-# Pydantic response models
-# -----------------------------
-
-class GetImageOut(BaseModel):
-    image_id: str
-    name: str
-    lon: float | None = None
-    lat: float | None = None
-    alt_m: float | None = None
-    yaw_deg: float | None = None
-    created: dt.datetime | None = None
-    signed_url: str
-    object_name: str
-    imported_utc: str
-
-    # Needed so FastAPI can serialize from SQLAlchemy model instances
-    model_config = ConfigDict(from_attributes=True)
-
-class BaseImage(BaseModel):
-    image_id: str
-    name: str
-    lon: float | None = None
-    lat: float | None = None
-    alt_m: float | None = None
-    yaw_deg: float | None = None
-    created: dt.datetime | None = None
-    object_name: str
-    imported_utc: str
-
-    # Needed so FastAPI can serialize from SQLAlchemy model instances
-    model_config = ConfigDict(from_attributes=True)
-
-class CreateImageOut(BaseModel):
-    status: str
-    image: BaseImage
-    file_path: str
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "status": "ok",
-                "image": {
-                    "image_id": 24,
-                    "name": "2025-08-27--12-55-33-SG-006614-SCPP-Inspection.jpeg",
-                    "lon": 139.49234083333332,
-                    "lat": -30.151920194444443,
-                    "alt_m": 181.128,
-                    "yaw_deg": 190.0,
-                    "imported_utc": "2025-11-17T07:42:12.788912+00:00"
-                },
-                "file_path": "D:\\apps\\skyline-fusion-api\\data\\images\\2025-08-27--12-55-33-SG-006614-SCPP-Inspection.jpeg"
-            }
-        }
-    )
-
-class CreateImagesOut(BaseModel):
-    status: str
-    images: List[BaseImage]
-    file_paths: List[str]
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "status": "ok",
-                "images": [
-                    {
-                        "image_id": "63fbcd80-8e84-4c2d-b3c1-d0155329c638",
-                        "name": "2025-10-07--08-38-21-SG-006919-SCPP-Inspection.jpeg",
-                        "lon": 139.548454833333,
-                        "lat": -30.1478478055556,
-                        "alt_m": 174.738,
-                        "yaw_deg": -13.1,
-                        "created": "2025-10-07T08:38:21",
-                        "object_name": "images/2025-10-07--08-38-21-SG-006919-SCPP-Inspection.jpeg",
-                        "imported_utc": "2025-11-24T14:20:20.290730+00:00",
-                    },
-                    {
-                        "image_id": "5f4744a8-6a5b-4a70-9e28-9d0d4a57af11",
-                        "name": "2025-10-07--08-39-01-SG-006920-SCPP-Inspection.jpeg",
-                        "lon": 139.5485,
-                        "lat": -30.1479,
-                        "alt_m": 175.0,
-                        "yaw_deg": -10.0,
-                        "created": "2025-10-07T08:39:01",
-                        "object_name": "images/2025-10-07--08-39-01-SG-006920-SCPP-Inspection.jpeg",
-                        "imported_utc": "2025-11-24T14:25:10.000000+00:00",
-                    },
-                ],
-                "file_paths": [
-                    "D:\\apps\\skyline-fusion-api\\data\\images\\2025-10-07--08-38-21-SG-006919-SCPP-Inspection.jpeg",
-                    "D:\\apps\\skyline-fusion-api\\data\\images\\2025-10-07--08-39-01-SG-006920-SCPP-Inspection.jpeg",
-                ],
-            }
-        }
-    )
 
 # -----------------------------
 # Route
@@ -328,3 +236,157 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     image_out = image_out.model_copy(update={"signed_url": signed_url})
 
     return image_out
+
+@router.post(
+    "/images/cluster",
+    response_model=ClusterSummary,
+    tags=["image"],
+    summary="Cluster images into spatial groups",
+    description=(
+        "Reads all images with a valid lon/lat from the `images` table and groups them into "
+        "clusters based on a maximum distance threshold (in meters). "
+        "Each cluster becomes an entry in `image_classes`, and `image_lookup` maps images "
+        "to their cluster."
+    ),
+)
+def cluster_images_endpoint(
+    params: ClusterRequest,
+    db: Session = Depends(get_db),
+):
+    # 1. Load all images with coordinates
+    images: list[Image] = (
+        db.query(Image)
+        .filter(Image.lat.isnot(None))
+        .filter(Image.lon.isnot(None))
+        .all()
+    )
+
+    if not images:
+        raise HTTPException(status_code=400, detail="No images with coordinates to cluster")
+
+    total_images = len(images)
+
+    # 2. Optionally clear existing classes & lookups
+    if params.reset_existing:
+        db.query(ImageLookup).delete()
+        db.query(ImageClass).delete()
+        db.commit()
+
+    # 3. Cluster in memory
+    clusters = cluster_images_by_distance(images, params.max_distance_m, params.max_yaw_diff_deg)
+
+    # 4. Create ImageClass & ImageLookup rows
+    now_utc = dt.datetime.now(dt.timezone.utc).isoformat()
+    clusters_created = 0
+    images_clustered = 0
+
+    for cluster in clusters:
+        if not cluster:
+            continue
+
+        # Compute centroid lat/lon of cluster
+        lats = [img.lat for img in cluster if img.lat is not None]
+        lons = [img.lon for img in cluster if img.lon is not None]
+
+        if not lats or not lons:
+            # Skip cluster with no usable coordinates
+            continue
+
+        centroid_lat = cast(float, sum(lats) / len(lats))
+        centroid_lon = cast(float, sum(lons) / len(lons))
+
+        # Optionally average alt/yaw too
+        alts = [img.alt_m for img in cluster if img.alt_m is not None]
+        yaws = [img.yaw_deg for img in cluster if img.yaw_deg is not None]
+
+        avg_alt = sum(alts) / len(alts) if alts else None
+        avg_yaw = sum(yaws) / len(yaws) if yaws else None
+
+        class_id = str(uuid.uuid4())
+        geom: WKBElement = from_shape(Point(centroid_lon, centroid_lat), srid=4326) 
+        image_class = ImageClass(
+            class_id=class_id,
+            name=f"Cluster {clusters_created + 1}",
+            lon=centroid_lon,
+            lat=centroid_lat,
+            alt_m=avg_alt,
+            yaw_deg=avg_yaw,
+            image_count=len(cluster),
+            updated_utc=now_utc,
+            geom=geom 
+        )
+        db.add(image_class)
+
+        # Create lookup entries
+        for img in cluster:
+            lookup = ImageLookup(
+                image_id=img.image_id,  # note: this is the TEXT id, not numeric PK
+                class_id=class_id,
+            )
+            db.add(lookup)
+
+        clusters_created += 1
+        images_clustered += len(cluster)
+
+    db.commit()
+
+    unclustered_images = total_images - images_clustered
+
+    return ClusterSummary(
+        status="ok",
+        clusters_created=clusters_created,
+        images_clustered=images_clustered,
+        unclustered_images=unclustered_images,
+    )
+
+
+@router.get(
+    "/images/cluster/{cluster_id}",
+    status_code=200,
+    response_model=ClusterOut,
+    tags=["image", "cluster"],
+    summary="All the images from a given cluster_id",
+    description=(
+        "retrieves all the images from a given cluster id using th and returns them using the "
+    ),
+)
+def get_cluster_by_id(cluster_id: str, db: Session = Depends(get_db)):
+    image_lookup_rows: List[ImageLookup] = (
+        db.query(ImageLookup)
+        .filter(ImageLookup.class_id == cluster_id)
+        .all()
+    )
+
+    if not image_lookup_rows:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    # Use the relationship to get Image objects
+    images_out: List[GetImageOut] = []
+
+    for row in image_lookup_rows:
+        image = row.image
+        if image is None:
+            continue
+
+        signed_url = generate_signed_url(str(image.object_name), expires_in_seconds=3600)
+        
+        images_out.append(
+            GetImageOut(
+                image_id=image.image_id,
+                name=image.name,
+                lon=image.lon,
+                lat=image.lat,
+                alt_m=image.alt_m,
+                yaw_deg=image.yaw_deg,
+                created=image.created,
+                signed_url=signed_url,
+                object_name=image.object_name,
+                imported_utc=image.imported_utc,
+            )
+        )
+
+    return ClusterOut(
+        cluster_id=cluster_id,
+        images=images_out
+    )
+
