@@ -215,8 +215,10 @@ function ClusterViewerPage() {
                         maxHeight: "70vh",
                         objectFit: "contain",
                         borderRadius: 1,
-                        border: "1px solid rgba(255,255,255,0.1)"
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        cursor: "pointer"
                       }}
+                      onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
                     />
 
                     <Typography variant="body2" sx={{ mt: 1 }}>

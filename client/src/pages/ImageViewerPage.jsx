@@ -83,8 +83,10 @@ function ImageViewerPage() {
                   maxHeight: "70vh",
                   borderRadius: 1,
                   objectFit: "contain",
-                  border: "1px solid rgba(0,0,0,0.1)"
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  cursor: "pointer"
                 }}
+                onClick={() => window.open(image.signed_url, "_blank", "noopener,noreferrer")}
               />
 
               <Typography variant="body2" sx={{ mt: 1 }}>
