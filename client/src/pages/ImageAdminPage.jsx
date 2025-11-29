@@ -26,18 +26,40 @@ function ImageAdminPage() {
     console.log("file set");
   }
 
-  const handleUpload = (event) => {
+  const handleUpload = async (event) => {
     event.preventDefault();
     setLoading(true);
 
+    const formData = new FormData();
+    formData.append("file", file);
 
-    console.log('Submitting file:', file.name);
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/images`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-    setFile(null);
-    setLoading(false);
+      if (response.status === 201) {
+        setResponseData(response.data);
+
+        console.log("submitted file:", file.name)
+        console.log(response.data);
+      }
+    } catch (error) {
+      console.error(error);
+      setResponseData(error);
+    } finally {
+      setLoading(false);
+      setFile(null)
+    }
   }
 
-  const handleClustering = (event) => {
+  const handleClustering = async (event) => {
     event.preventDefault();
     setLoading(true);
 
@@ -45,14 +67,48 @@ function ImageAdminPage() {
       max_distance_m: Number(maxDistance),
       max_yaw_diff_deg: Number(maxYawDiff),
       reset_existing: resetExisting,
-    };
+    }
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/images/cluster`,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    // send the request to cluster images
-    // get data back and display in the right box
+      if (response.status === 200) {
+        setResponseData(response.data);
+      }
+    } catch (error) {
+      console.log(error);
+      setResponseData(error);
+    } finally {
+      setLoading(false);
+    }
 
-    console.log("sent payload", payload);
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/images/cluster`,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    setLoading(false);
+      if (response.status === 200) {
+        setResponseData(response.data);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+      console.log("sent payload", payload);
+    }
   }
 
   return (
@@ -60,7 +116,8 @@ function ImageAdminPage() {
       sx={{
         display: "flex",
         flexDirection: "column",
-        padding: 1
+        padding: 1,
+        maxWidth: 900
       }}
     >
       <Box
@@ -86,7 +143,8 @@ function ImageAdminPage() {
           sx={{
             flex: 1,
             display: "flex",
-            flexDirection: "column"
+            flexDirection: "column",
+            maxWidth: 380
           }}
         >
           <Typography
@@ -209,10 +267,26 @@ function ImageAdminPage() {
             backgroundColor: "#F1F1F2",
             borderRadius: 2,
             ml: 1,
-            p: 2
+            p: 2,
+            maxHeight: 310,
+            overflow: 'auto',
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": {
+              display: "none"
+            }
           }}
         >
-          {responseData ? responseData :
+          {responseData ?
+            <Typography
+              fontSize={14}
+              sx={{
+                color: "#003366"
+              }}
+              component="pre"
+            >
+              {JSON.stringify(responseData, null, 2)}
+            </Typography>
+            :
             <Typography
               fontSize={14}
               sx={{
@@ -225,7 +299,7 @@ function ImageAdminPage() {
           }
         </Box>
       </Box>
-    </Box>
+    </Box >
   )
 }
 
