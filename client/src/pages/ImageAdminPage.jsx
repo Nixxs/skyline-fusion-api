@@ -6,9 +6,11 @@ import {
   Button,
   TextField,
   FormControlLabel,
-  Checkbox
+  Checkbox,
+  CircularProgress
 } from "@mui/material";
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
+import Tooltip from '@mui/material/Tooltip';
 
 function ImageAdminPage() {
   const [loading, setLoading] = useState(false);
@@ -144,7 +146,8 @@ function ImageAdminPage() {
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            maxWidth: 380
+            maxWidth: 380,
+            position: "relative"
           }}
         >
           <Typography
@@ -165,33 +168,38 @@ function ImageAdminPage() {
               display: "flex"
             }}
           >
-            <Button
-              variant="outlined"
-              component="label"
-              sx={{
-                flex: 1
-              }}
-            >
-              <FileUploadOutlinedIcon />
-              {file ? file.name : "Browse"}
-              <input
-                type="file"
-                hidden
-                onChange={handleFileChange}
-              />
-            </Button>
-            <Button
-              disabled={file ? false : true}
-              variant="contained"
-              component="label"
-              sx={{
-                ml: 1,
-                flex: 1
-              }}
-              onClick={handleUpload}
-            >
-              Upload
-            </Button>
+            <Tooltip title="Select a .zip of drone images (jpeg,png,tif)">
+              <Button
+                variant="outlined"
+                component="label"
+                sx={{
+                  flex: 1
+                }}
+              >
+                <FileUploadOutlinedIcon />
+                {file ? file.name : "Browse"}
+                <input
+                  type="file"
+                  hidden
+                  accept=".zip,application/zip,application/x-zip-compressed"
+                  onChange={handleFileChange}
+                />
+              </Button>
+            </Tooltip>
+            <Tooltip title="select a file first, then upload from here">
+              <Button
+                disabled={file ? false : true}
+                variant="contained"
+                component="label"
+                sx={{
+                  ml: 1,
+                  flex: 1
+                }}
+                onClick={handleUpload}
+              >
+                Upload
+              </Button>
+            </Tooltip>
           </Box>
 
           <Typography
@@ -259,6 +267,23 @@ function ImageAdminPage() {
               Submit
             </Button>
           </Box>
+
+          {loading && (
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                bgcolor: "rgba(255,255,255,0.7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          )}
+
         </Box>
         <Box
           sx={{
