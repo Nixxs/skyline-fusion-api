@@ -10,7 +10,7 @@ from geoalchemy2 import WKBElement
 
 logger = logging.getLogger(__name__)
 
-def extract_exif_geo(file_path: str) -> Tuple[Optional[str], Optional[float], Optional[float], Optional[float], Optional[float], Optional[datetime], Optional[WKBElement]]:
+def extract_exif_geo(file_path: str) -> Tuple[Optional[str], Optional[float], Optional[float], Optional[float], Optional[float], Optional[datetime], Optional[WKBElement], Optional[str]]:
     """
     Read EXIF from an image file and return (name, lon, lat, alt_m, yaw_deg, created).
     Returns (None,None, None, None, None, None) if not available.
@@ -26,10 +26,11 @@ def extract_exif_geo(file_path: str) -> Tuple[Optional[str], Optional[float], Op
             yaw:float  = metadata.get("XMP:GimbalYawDegree")
             created:datetime = datetime.strptime(metadata.get("EXIF:CreateDate"), "%Y:%m:%d %H:%M:%S")
             geom:WKBElement = from_shape(Point(lon, lat), srid=4326)
+            image_type:str = metadata.get("EXIF:XPKeywords") 
 
-            return name, lon, lat, alt, yaw, created, geom
+            return name, lon, lat, alt, yaw, created, geom, image_type
 
     except Exception as e:
         # If anything goes wrong, fail soft
         logger.warning(f"Failed to extract EXIF from {file_path}: {e}")
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None

@@ -115,7 +115,12 @@ function ClusterViewerPage() {
       sx={{
         display: "flex",
         flexDirection: "column",
-        height: "100%"
+        height: "100%",
+        overflow: 'auto',
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": {
+          display: "none"
+        }
       }}
     >
       <Box>

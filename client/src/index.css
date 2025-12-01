@@ -11,9 +11,16 @@ html, body, #root {
   height: 100%;
   width: 100%;
   font-family: sans-serif;
+  overflow: hidden;
+  scrollbar-width: none;
 }
 
 /* optional body styling */
 body {
   background-color: #fafafa;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;           /* Chrome / Edge / Safari */
 }

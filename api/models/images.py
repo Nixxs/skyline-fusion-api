@@ -17,6 +17,7 @@ class GetImageOut(BaseModel):
     signed_url: str
     object_name: str
     imported_utc: str
+    image_type: str
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -31,6 +32,7 @@ class BaseImage(BaseModel):
     created: dt.datetime | None = None
     object_name: str
     imported_utc: str
+    image_type: str
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -51,7 +53,8 @@ class CreateImageOut(BaseModel):
                     "lat": -30.151920194444443,
                     "alt_m": 181.128,
                     "yaw_deg": 190.0,
-                    "imported_utc": "2025-11-17T07:42:12.788912+00:00"
+                    "imported_utc": "2025-11-17T07:42:12.788912+00:00",
+                    "image_type": "standard"
                 },
                 "file_path": "D:\\apps\\skyline-fusion-api\\data\\images\\2025-08-27--12-55-33-SG-006614-SCPP-Inspection.jpeg"
             }
@@ -78,6 +81,7 @@ class CreateImagesOut(BaseModel):
                         "created": "2025-10-07T08:38:21",
                         "object_name": "images/2025-10-07--08-38-21-SG-006919-SCPP-Inspection.jpeg",
                         "imported_utc": "2025-11-24T14:20:20.290730+00:00",
+                        "image_type": "standard"
                     },
                     {
                         "image_id": "5f4744a8-6a5b-4a70-9e28-9d0d4a57af11",
@@ -89,6 +93,7 @@ class CreateImagesOut(BaseModel):
                         "created": "2025-10-07T08:39:01",
                         "object_name": "images/2025-10-07--08-39-01-SG-006920-SCPP-Inspection.jpeg",
                         "imported_utc": "2025-11-24T14:25:10.000000+00:00",
+                        "image_type": "standard"
                     },
                 ],
                 "file_paths": [

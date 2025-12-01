@@ -44,6 +44,7 @@ def cluster_images_by_distance(
         seed_lat = seed.lat
         seed_lon = seed.lon
         seed_yaw = getattr(seed, "yaw_deg", None)
+        seed_image_type = seed.image_type
 
         to_add: list[Any] = []
         for img in list(unassigned):
@@ -66,6 +67,9 @@ def cluster_images_by_distance(
 
                 if yaw_diff_deg(seed_yaw, img_yaw) > max_yaw_diff_deg:
                     continue
+
+            if img.image_type != seed_image_type:
+                continue
 
             to_add.append(img)
 

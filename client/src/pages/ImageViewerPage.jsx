@@ -38,7 +38,15 @@ function ImageViewerPage() {
   }, [id]);
 
   return (
-    <Box>
+    <Box
+      sx={{
+        overflow: 'auto',
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": {
+          display: "none"
+        }
+      }}
+    >
       <Typography
         fontSize={18}
         fontWeight={600}
