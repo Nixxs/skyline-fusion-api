@@ -225,36 +225,44 @@ function ClusterViewerPage() {
                 )}
 
                 {selectedImage && (
-                  <>
-                    <Typography
-                      sx={{
-                        flex: 1
-                      }}
-                      variant="h6">
-                      {selectedImage.name}
-                    </Typography>
+                  selectedImage.image_type !== "pano" ? (
+                    <>
+                      <Typography
+                        sx={{
+                          flex: 1
+                        }}
+                        variant="h6">
+                        {selectedImage.name}
+                      </Typography>
 
-                    <Box
-                      component="img"
-                      src={selectedImage.signed_url}
-                      alt={selectedImage.name}
-                      sx={{
-                        objectFit: "contain",
-                        borderRadius: 1,
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        cursor: "pointer",
-                        flex: 1,
-                        maxWidth: "100%",
-                        maxHeight: "100%"
-                      }}
-                      onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
-                    />
+                      <Box
+                        component="img"
+                        src={selectedImage.signed_url}
+                        alt={selectedImage.name}
+                        sx={{
+                          objectFit: "contain",
+                          borderRadius: 1,
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          cursor: "pointer",
+                          flex: 1,
+                          maxWidth: "100%",
+                          maxHeight: "100%"
+                        }}
+                        onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
+                      />
 
+                      <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
+                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
+                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
+                      </Typography>
+                    </>
+                  ) : (
                     <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
+                      PANO IMAGE VIEWER TO BE CREATED
                       Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
                       {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
                     </Typography>
-                  </>
+                  )
                 )}
               </Box>
             </Box>
