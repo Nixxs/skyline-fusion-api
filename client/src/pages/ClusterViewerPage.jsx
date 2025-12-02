@@ -10,6 +10,7 @@ import {
   Slider
 } from "@mui/material";
 import axios from "axios";
+import PanoViewer from "../components/PanoViewer";
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
@@ -215,7 +216,8 @@ function ClusterViewerPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  maxHeight: "365px"
+                  height: "450px"
+                  //maxHeight: "365px"
                 }}
               >
                 {!selectedImage && (
@@ -225,36 +227,48 @@ function ClusterViewerPage() {
                 )}
 
                 {selectedImage && (
-                  <>
-                    <Typography
-                      sx={{
-                        flex: 1
-                      }}
-                      variant="h6">
-                      {selectedImage.name}
-                    </Typography>
+                  selectedImage.image_type !== "pano" ? (
+                    <>
+                      <Box
+                        sx={{
+                          flex: 5,
+                          //height: "450px",     // matches left panel
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                          borderRadius: 1,
+                          border: "1px solid rgba(255,255,255,0.1)"
+                        }}
+                        onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
+                      >
+                        <Box
+                          component="img"
+                          src={selectedImage.signed_url}
+                          alt={selectedImage.name}
+                          sx={{
+                            maxWidth: "100%",
+                            maxHeight: "100%",
+                            objectFit: "contain",
+                            cursor: "pointer"
+                          }}
+                        />
+                      </Box>
 
-                    <Box
-                      component="img"
-                      src={selectedImage.signed_url}
-                      alt={selectedImage.name}
-                      sx={{
-                        objectFit: "contain",
-                        borderRadius: 1,
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        cursor: "pointer",
-                        flex: 1,
-                        maxWidth: "100%",
-                        maxHeight: "100%"
-                      }}
-                      onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
-                    />
-
-                    <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
-                      Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                      {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
-                    </Typography>
-                  </>
+                      <Typography variant="body2" sx={{ mt: 1, flex: 1, textAlign: "center" }}>
+                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
+                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <PanoViewer src={selectedImage.signed_url} />
+                      <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
+                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
+                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
+                      </Typography>
+                    </>
+                  )
                 )}
               </Box>
             </Box>
