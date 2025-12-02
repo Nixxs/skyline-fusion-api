@@ -12,9 +12,64 @@ const theme = createTheme({
       paper: "#1a2332",
     },
     text: {
+      default: "#0e1726",
       primary: "#0e1726",
       secondary: "#a0a0a0",
       disabled: "rgba(255,255,255,0.4)"
+    }
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        contained: {
+          fontSize: 14,
+          backgroundColor: '#003366',
+          color: '#ffffff',
+          '&:hover': {
+            backgroundColor: '#002244',
+          },
+          height: 38
+        },
+        outlined: {
+          fontSize: 14,
+          color: '#003366',
+          borderColor: '#003366',
+          '&:hover': {
+            borderColor: '#002244',
+            backgroundColor: 'rgba(0, 51, 102, 0.04)',
+          },
+          height: 38
+        },
+      },
+    },
+    MuiTextField: {
+      defaultProps: {
+        size: 'small',        // slimmer by default
+        variant: 'outlined',  // optional, if you want this default
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          fontSize: 14,       // smaller font
+          '& .MuiInputBase-input': {
+            paddingTop: 10,
+            paddingBottom: 10, // reduce vertical padding
+          },
+        },
+      },
+    },
+    // If you also want smaller labels:
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontSize: 14,
+        },
+      },
+    },
+    scrollbarWidth: "none",
+    "&::-webkit-scrollbar": {
+      display: "none"
     }
   },
 });

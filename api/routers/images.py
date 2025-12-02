@@ -72,7 +72,7 @@ async def create_image(
     logger.info(f"Saved uploaded image to {file_path}")
 
     # Extract EXIF geo info
-    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom = extract_exif_geo(file_path)
+    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type = extract_exif_geo(file_path)
     logger.info(
         f"EXIF for {file.filename}: "
         f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
@@ -91,7 +91,8 @@ async def create_image(
         created=created,
         object_name=object_name,
         imported_utc=imported,
-        geom=geom
+        geom=geom,
+        import_type=image_type
     )
 
     db.add(image)
@@ -175,7 +176,7 @@ async def create_images(
                 logger.info(f"Extracted image {member} to {extracted_path_obj}")
 
                 # Extract EXIF geo info
-                exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom = extract_exif_geo(
+                exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type = extract_exif_geo(
                     str(extracted_path_obj)
                 )
                 logger.info(
@@ -197,6 +198,7 @@ async def create_images(
                     object_name=object_name,
                     imported_utc=imported,
                     geom=geom,
+                    image_type=image_type
                 )
 
                 db.add(image)
@@ -298,9 +300,11 @@ def cluster_images_endpoint(
         # Optionally average alt/yaw too
         alts = [img.alt_m for img in cluster if img.alt_m is not None]
         yaws = [img.yaw_deg for img in cluster if img.yaw_deg is not None]
+        image_types = list(set([img.image_type for img in cluster if img.image_type is not None]))
 
         avg_alt = sum(alts) / len(alts) if alts else None
         avg_yaw = sum(yaws) / len(yaws) if yaws else None
+        image_type = image_types[0] if len(image_types) == 1 else "multiple"
 
         class_id = str(uuid.uuid4())
         geom: WKBElement = from_shape(Point(centroid_lon, centroid_lat), srid=4326) 
@@ -313,7 +317,8 @@ def cluster_images_endpoint(
             yaw_deg=avg_yaw,
             image_count=len(cluster),
             updated_utc=now_utc,
-            geom=geom 
+            geom=geom,
+            image_type=image_type
         )
         db.add(image_class)
 
@@ -382,6 +387,7 @@ def get_cluster_by_id(cluster_id: str, db: Session = Depends(get_db)):
                 signed_url=signed_url,
                 object_name=image.object_name,
                 imported_utc=image.imported_utc,
+                image_type=image.image_type
             )
         )
 

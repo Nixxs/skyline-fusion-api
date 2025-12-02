@@ -115,7 +115,12 @@ function ClusterViewerPage() {
       sx={{
         display: "flex",
         flexDirection: "column",
-        height: "100%"
+        height: "100vh",
+        overflow: 'auto',
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": {
+          display: "none"
+        }
       }}
     >
       <Box>
@@ -149,6 +154,19 @@ function ClusterViewerPage() {
                 max={timeBounds[1]}
                 step={1000} // 1 second
                 valueLabelDisplay="off"
+                sx={{
+                  color: "#0a2463", // navy blue
+                  "& .MuiSlider-thumb": {
+                    backgroundColor: "#ffffff",
+                    border: "2px solid #003366",
+                  },
+                  "& .MuiSlider-track": {
+                    backgroundColor: "#003366",
+                  },
+                  "& .MuiSlider-rail": {
+                    backgroundColor: "#0a246380", // 50% transparent navy
+                  },
+                }}
               />
             </Box>
 
@@ -165,7 +183,12 @@ function ClusterViewerPage() {
                 sx={{
                   flex: 1,
                   borderRight: "1px solid rgba(255,255,255,0.1)",
-                  overflowY: "auto"
+                  overflowY: "auto",
+                  height: "450px",
+                  scrollbarWidth: "none",
+                  "&::-webkit-scrollbar": {
+                    display: "none"
+                  }
                 }}
               >
                 <List dense>
@@ -191,7 +214,8 @@ function ClusterViewerPage() {
                   padding: "8px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 2
+                  gap: 2,
+                  maxHeight: "365px"
                 }}
               >
                 {!selectedImage && (
@@ -202,7 +226,11 @@ function ClusterViewerPage() {
 
                 {selectedImage && (
                   <>
-                    <Typography variant="h6">
+                    <Typography
+                      sx={{
+                        flex: 1
+                      }}
+                      variant="h6">
                       {selectedImage.name}
                     </Typography>
 
@@ -211,19 +239,20 @@ function ClusterViewerPage() {
                       src={selectedImage.signed_url}
                       alt={selectedImage.name}
                       sx={{
-                        maxWidth: "100%",
-                        maxHeight: "70vh",
                         objectFit: "contain",
                         borderRadius: 1,
                         border: "1px solid rgba(255,255,255,0.1)",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        flex: 1,
+                        maxWidth: "100%",
+                        maxHeight: "100%"
                       }}
                       onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
                     />
 
-                    <Typography variant="body2" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
                       Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                      {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°
+                      {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
                     </Typography>
                   </>
                 )}

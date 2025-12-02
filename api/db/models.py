@@ -18,6 +18,7 @@ class Image(Base):
     object_name = Column(String, nullable=False)
     imported_utc = Column(Text, nullable=False)
     geom = Column(Geometry(geometry_type="POINT", srid=4326))
+    image_type = Column(Text)
 
     # relationships
     classes = relationship("ImageLookup", back_populates="image")
@@ -35,6 +36,7 @@ class ImageClass(Base):
     image_count = Column(Integer, nullable=False, default=0)
     updated_utc = Column(Text)
     geom = Column(Geometry(geometry_type="POINT", srid=4326))
+    image_type = Column(Text)
 
     images = relationship("ImageLookup", back_populates="image_class")
 

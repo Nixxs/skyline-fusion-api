@@ -38,7 +38,15 @@ function ImageViewerPage() {
   }, [id]);
 
   return (
-    <Box>
+    <Box
+      sx={{
+        overflow: 'auto',
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": {
+          display: "none"
+        }
+      }}
+    >
       <Typography
         fontSize={18}
         fontWeight={600}
@@ -59,7 +67,7 @@ function ImageViewerPage() {
             padding: "8px",
             display: "flex",
             flexDirection: "column",
-            gap: 2
+            gap: 2,
           }}
         >
           {!image && (
@@ -80,7 +88,6 @@ function ImageViewerPage() {
                 alt={image.name}
                 sx={{
                   maxWidth: "100%",
-                  maxHeight: "70vh",
                   borderRadius: 1,
                   objectFit: "contain",
                   border: "1px solid rgba(0,0,0,0.1)",
@@ -91,7 +98,7 @@ function ImageViewerPage() {
 
               <Typography variant="body2" sx={{ mt: 1 }}>
                 Lon: {image.lon}, Lat: {image.lat}, Alt:{" "}
-                {image.alt_m} m, Yaw: {image.yaw_deg}°
+                {image.alt_m} m, Yaw: {image.yaw_deg}°, Type: {image.image_type}
               </Typography>
             </>
           )}
