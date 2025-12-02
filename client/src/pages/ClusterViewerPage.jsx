@@ -6,12 +6,14 @@ import {
   List,
   ListItemButton,
   ListItemText,
-  Slider
+  Slider,
+  IconButton
 } from "@mui/material";
 import axios from "axios";
 import PanoViewer from "../components/PanoViewer";
 import TerraExplorerControls from "../components/TerraExplorerControls";
-
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
@@ -42,7 +44,7 @@ function ClusterViewerPage() {
         }));
 
         // Sort by time ascending
-        imgs.sort((a, b) => a.createdMs - b.createdMs);
+        imgs.sort((a, b) => b.createdMs - a.createdMs);
 
         setImages(imgs);
 
@@ -65,6 +67,39 @@ function ClusterViewerPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goToNextImage = () => {
+    if (!selectedImage || filteredImages.length === 0) return;
+
+    const currentIndex = filteredImages.findIndex(
+      (img) => img.image_id === selectedImage.image_id
+    );
+
+    if (currentIndex === -1) {
+      setSelectedImage(filteredImages[0]);
+      return;
+    }
+
+    const nextIndex = (currentIndex + 1) % filteredImages.length; // wrap around
+    setSelectedImage(filteredImages[nextIndex]);
+  };
+
+  const goToPreviousImage = () => {
+    if (!selectedImage || filteredImages.length === 0) return;
+
+    const currentIndex = filteredImages.findIndex(
+      (img) => img.image_id === selectedImage.image_id
+    );
+
+    if (currentIndex === -1) {
+      setSelectedImage(filteredImages[0]);
+      return;
+    }
+
+    const prevIndex =
+      (currentIndex - 1 + filteredImages.length) % filteredImages.length; // wrap around
+    setSelectedImage(filteredImages[prevIndex]);
   };
 
   useEffect(() => {
@@ -217,8 +252,7 @@ function ClusterViewerPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  height: "450px"
-                  //maxHeight: "365px"
+                  height: "450px",
                 }}
               >
                 {!selectedImage && (
@@ -228,21 +262,21 @@ function ClusterViewerPage() {
                 )}
 
                 {selectedImage && (
-                  selectedImage.image_type !== "pano" ? (
-                    <>
-                      <Box
-                        sx={{
-                          flex: 5,
-                          //height: "450px",     // matches left panel
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
-                          borderRadius: 1,
-                          border: "1px solid rgba(255,255,255,0.1)"
-                        }}
-                        onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
-                      >
+                  <>
+                    {/* Viewer container with overlay arrows */}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        flex: 5,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                        borderRadius: 1,
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      {selectedImage.image_type !== "pano" ? (
                         <Box
                           component="img"
                           src={selectedImage.signed_url}
@@ -251,27 +285,68 @@ function ClusterViewerPage() {
                             maxWidth: "100%",
                             maxHeight: "100%",
                             objectFit: "contain",
-                            cursor: "pointer"
+                            cursor: "pointer",
                           }}
+                          onClick={() =>
+                            window.open(
+                              selectedImage.signed_url,
+                              "_blank",
+                              "noopener,noreferrer"
+                            )
+                          }
                         />
-                      </Box>
+                      ) : (
+                        <PanoViewer src={selectedImage.signed_url} />
+                      )}
 
-                      <Typography variant="body2" sx={{ mt: 1, flex: 1, textAlign: "center" }}>
-                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
-                      </Typography>
+                      {/* Previous button (left) */}
+                      {filteredImages.length > 1 && (
+                        <>
+                          <IconButton
+                            onClick={goToPreviousImage}
+                            size="large"
+                            sx={{
+                              position: "absolute",
+                              left: 8,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              backgroundColor: "rgba(0,0,0,0.1)",
+                              "&:hover": {
+                                backgroundColor: "rgba(0,0,0,0.4)",
+                              },
+                            }}
+                          >
+                            <ChevronLeftIcon />
+                          </IconButton>
 
-                      <TerraExplorerControls selectedImage={selectedImage} />
-                    </>
-                  ) : (
-                    <>
-                      <PanoViewer src={selectedImage.signed_url} />
-                      <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
-                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
-                      </Typography>
-                    </>
-                  )
+                          {/* Next button (right) */}
+                          <IconButton
+                            onClick={goToNextImage}
+                            size="large"
+                            sx={{
+                              position: "absolute",
+                              right: 8,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              backgroundColor: "rgba(0,0,0,0.1)",
+                              "&:hover": {
+                                backgroundColor: "rgba(0,0,0,0.2)",
+                              },
+                            }}
+                          >
+                            <ChevronRightIcon />
+                          </IconButton>
+                        </>
+                      )}
+                    </Box>
+
+                    {/* Metadata */}
+                    <Typography variant="body2" sx={{ mt: 1, textAlign: "center" }}>
+                      Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
+                      {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type:{" "}
+                      {selectedImage.image_type}
+                    </Typography>
+                  </>
                 )}
               </Box>
             </Box>
