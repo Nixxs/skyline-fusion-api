@@ -1,4 +1,3 @@
-
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -11,6 +10,8 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import PanoViewer from "../components/PanoViewer";
+import TerraExplorerControls from "../components/TerraExplorerControls";
+
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
@@ -259,6 +260,8 @@ function ClusterViewerPage() {
                         Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
                         {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
                       </Typography>
+
+                      <TerraExplorerControls selectedImage={selectedImage} />
                     </>
                   ) : (
                     <>
