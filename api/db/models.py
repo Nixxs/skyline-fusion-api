@@ -19,6 +19,9 @@ class Image(Base):
     imported_utc = Column(Text, nullable=False)
     geom = Column(Geometry(geometry_type="POINT", srid=4326))
     image_type = Column(Text)
+    hfov = Column(Float)
+    vfov = Column(Float)
+    pitch = Column(Float)
 
     # relationships
     classes = relationship("ImageLookup", back_populates="image")
@@ -37,6 +40,9 @@ class ImageClass(Base):
     updated_utc = Column(Text)
     geom = Column(Geometry(geometry_type="POINT", srid=4326))
     image_type = Column(Text)
+    hfov = Column(Float)
+    vfov = Column(Float)
+    pitch = Column(Float)
 
     images = relationship("ImageLookup", back_populates="image_class")
 
