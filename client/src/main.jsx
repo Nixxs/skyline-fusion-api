@@ -67,6 +67,10 @@ const theme = createTheme({
         },
       },
     },
+    scrollbarWidth: "none",
+    "&::-webkit-scrollbar": {
+      display: "none"
+    }
   },
 });
 
