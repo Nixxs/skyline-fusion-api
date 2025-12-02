@@ -18,6 +18,9 @@ class GetImageOut(BaseModel):
     object_name: str
     imported_utc: str
     image_type: str
+    pitch: float | None = None
+    hfov: float | None = None
+    vfov: float | None = None
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -33,6 +36,10 @@ class BaseImage(BaseModel):
     object_name: str
     imported_utc: str
     image_type: str
+    pitch: float | None = None
+    hfov: float | None = None
+    vfov: float | None = None
+
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -54,7 +61,10 @@ class CreateImageOut(BaseModel):
                     "alt_m": 181.128,
                     "yaw_deg": 190.0,
                     "imported_utc": "2025-11-17T07:42:12.788912+00:00",
-                    "image_type": "standard"
+                    "image_type": "standard",
+                    "pitch": 34.22,
+                    "hfov": 120.45,
+                    "vfov": 90.1
                 },
                 "file_path": "D:\\apps\\skyline-fusion-api\\data\\images\\2025-08-27--12-55-33-SG-006614-SCPP-Inspection.jpeg"
             }
