@@ -7,6 +7,7 @@ from api.config import config
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
 from geoalchemy2 import WKBElement
+from api.utils.fov import compute_hv_fov
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,12 @@ def extract_exif_geo(file_path: str) -> Tuple[
             geom:WKBElement = from_shape(Point(lon, lat), srid=4326)
             image_type:str = metadata.get("EXIF:XPKeywords")
             pitch:float = metadata.get("XMP:GimbalPitchDegree")
-            hfov:float = metadata.get("Composite:FOV")
-            vfov: float = metadata.get("Composite:FOV")
+
+            width_px:int = metadata.get("EXIF:ExifImageWidth")
+            height_px:int = metadata.get("EXIF:ExifImageHeight")
+            cfov:float = metadata.get("Composite:FOV")
+
+            hfov, vfov = compute_hv_fov(cfov, width_px, height_px)
 
             return name, lon, lat, alt, yaw, created, geom, image_type, pitch, hfov, vfov
 
