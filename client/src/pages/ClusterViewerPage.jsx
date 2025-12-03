@@ -140,13 +140,35 @@ function ClusterViewerPage() {
   const formatTime = (ms) => {
     if (!ms) return "";
     const d = new Date(ms);
-    return d.toLocaleTimeString([], {
-      day: "2-digit",
+    return d.toLocaleTimeString("en-AU", {
+      weekday: "long",
       month: "short",
+      day: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit"
+      second: "2-digit",
+      hour12: true
+    });
+  };
+
+  const formatDayDate = (ms) => {
+    if (!ms) return "";
+    return new Date(ms).toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatTimeOnly = (ms) => {
+    if (!ms) return "";
+    return new Date(ms).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
     });
   };
 
@@ -195,7 +217,7 @@ function ClusterViewerPage() {
             paddingBottom: "0px"
           }}
         >
-          Image Cluster: {cluster_id}
+          Time Range:
         </Typography>
       </Box>
 
@@ -214,7 +236,7 @@ function ClusterViewerPage() {
             {/* Time slider */}
             <Box sx={{ px: 2, pb: 0 }}>
               <Typography variant="body2" sx={{ mb: 1, ml: -1 }}>
-                Time range: {formatTime(timeRange[0])} – {formatTime(timeRange[1])}
+                {formatTime(timeRange[0])} – {formatTime(timeRange[1])}
               </Typography>
               <Slider
                 value={timeRange}
@@ -256,6 +278,7 @@ function ClusterViewerPage() {
                   borderRight: "1px solid rgba(255,255,255,0.1)",
                   overflowY: "auto",
                   scrollbarWidth: "none",
+                  maxWidth: "300px",
                   "&::-webkit-scrollbar": {
                     display: "none"
                   }
@@ -269,8 +292,8 @@ function ClusterViewerPage() {
                       onClick={() => setSelectedImage(img)}
                     >
                       <ListItemText
-                        primary={img.name}
-                        secondary={img.created}
+                        primary={formatDayDate(img.createdMs)}
+                        secondary={formatTimeOnly(img.createdMs)}
                       />
                     </ListItemButton>
                   ))}
@@ -280,7 +303,7 @@ function ClusterViewerPage() {
               {/* Right panel: selected image */}
               <Box
                 sx={{
-                  flex: 3,
+                  flex: 5,
                   padding: "8px",
                   display: "flex",
                   flexDirection: "column",

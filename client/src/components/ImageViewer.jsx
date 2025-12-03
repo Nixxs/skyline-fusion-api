@@ -19,7 +19,7 @@ export default function ImageViewer({ selectedImage }) {
           <Stack
             direction="row"
             spacing={1}
-            sx={{ position: "absolute", top: 8, right: 8, zIndex: 10 }}
+            sx={{ position: "absolute", bottom: 8, left: 8, zIndex: 10 }}
           >
             <IconButton
               size="small"
