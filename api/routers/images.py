@@ -4,20 +4,21 @@ import uuid
 import zipfile
 import os
 import shutil
-from typing import cast, List
+from typing import cast, List, Optional
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from sqlalchemy.orm import Session
 from api.db.session import get_db
 from api.db.models import Image, ImageClass, ImageLookup
 from api.utils.file_handler import save_file
 from api.utils.exif import extract_exif_geo
+from api.utils.image_management import delete_image_instance
 from pathlib import Path
-from api.utils.gcp import handle_gcs_image_upload, generate_signed_url, delete_gcs_image
+from api.utils.gcp import handle_gcs_image_upload, generate_signed_url 
 from api.utils.image_classification import cluster_images_by_distance
-from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage
+from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
@@ -250,17 +251,94 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
 
     return image_out
 
+
+@router.get("/images", response_model=ImageListResponse)
+def list_images(
+    page: int = Query(1, ge=1, description="1-based page index"),
+    page_size: int = Query(
+        50,
+        ge=1,
+        le=200,
+        description="Page size (max 200 to protect the DB)",
+    ),
+    image_type: Optional[str] = Query(
+        None, description="Filter by image_type (e.g. 'pano', 'photo')"
+    ),
+    search: Optional[str] = Query(
+        None, description="Case-insensitive name contains filter"
+    ),
+    class_id: Optional[str] = Query(
+        None, description="Filter by related ImageClass class_id"
+    ),
+    created_from: Optional[dt.datetime] = Query(
+        None, description="Filter: created >= this UTC datetime"
+    ),
+    created_to: Optional[dt.datetime] = Query(
+        None, description="Filter: created <= this UTC datetime"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Paged, filterable list of images.
+
+    Intended for grids / selectors where users can:
+    - see image metadata
+    - filter / search
+    - select multiple rows for batch delete, etc.
+    """
+    query = db.query(Image)
+
+    # Optional join if filtering by class_id
+    if class_id:
+        query = (
+            query.join(ImageLookup, Image.image_id == ImageLookup.image_id)
+            .filter(ImageLookup.class_id == class_id)
+        )
+
+    if image_type:
+        query = query.filter(Image.image_type == image_type)
+
+    if search:
+        like = f"%{search}%"
+        query = query.filter(Image.name.ilike(like))
+
+    if created_from:
+        query = query.filter(Image.created >= created_from)
+    if created_to:
+        query = query.filter(Image.created <= created_to)
+
+    # Total before pagination
+    total = query.count()
+
+    # Apply ordering + pagination
+    # Primary sort by created desc (nulls last), then FID as tie-breaker
+    query = (
+        query.order_by(
+            Image.created.desc().nullslast(),
+            Image.FID.desc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+
+    images = query.all()
+
+    # Explicit mapping keeps the type checker happy
+    items = [ImageListItem.model_validate(img) for img in images]
+
+    return ImageListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=items,  # Pydantic uses from_attributes=True to map
+    )
+
+
+
 @router.delete("/image/{image_id}", status_code=200)
 def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
     """
     Delete an image by ID.
-
-    Behaviour:
-    - Look up the image in the `images` table.
-    - Delete any `image_lookup` rows referencing this image.
-    - Optionally decrement `image_count` on related `image_classes`.
-    - Delete the image row itself.
-    - Delete the corresponding object from Google Cloud Storage.
     """
     image: Image | None = (
         db.query(Image)
@@ -271,36 +349,64 @@ def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    object_name = image.object_name
-
-    # Delete lookup rows + maintain image_count on classes
-    lookups: list[ImageLookup] = (
-        db.query(ImageLookup)
-          .filter(ImageLookup.image_id == image_id)
-          .all()
-    )
-
-    for lk in lookups:
-        if lk.image_class is not None:
-            ic = lk.image_class
-            ic.image_count = max((ic.image_count or 0) - 1, 0)
-
-        db.delete(lk)
-
-    # Delete the image row
-    db.delete(image)
-
-    # Try to delete from GCS; if it fails, we still commit DB change
-    try:
-        if str(object_name):
-            delete_gcs_image(str(object_name))
-    except Exception as exc:
-        # Log but don't block the DB delete
-        logger.exception(f"Failed to delete GCS object {object_name}: {exc}")
+    gcs_deleted = delete_image_instance(image, db)
 
     db.commit()
 
-    return {"status": "ok", "deleted_image_id": image_id}
+    return {
+        "status": "ok",
+        "deleted_image_id": image_id,
+        "gcs_deleted": gcs_deleted,
+    }
+
+
+@router.delete("/images/batch", status_code=200)
+def delete_images_batch(payload: DeleteImagesRequest, db: Session = Depends(get_db)):
+    """
+    Delete multiple images by ID.
+
+    Behaviour:
+    - Look up all images in `images` table that match the provided IDs.
+    - For each found image:
+        - Delete `image_lookup` rows referencing it.
+        - Decrement `image_count` on related `image_classes`.
+        - Delete the image row.
+        - Attempt to delete from GCS (errors logged, do not block DB).
+    - Commit once at the end.
+    - Return summary of deleted and not-found IDs.
+    """
+    if not payload.image_ids:
+        raise HTTPException(status_code=400, detail="No image_ids provided")
+
+    # Load all images that exist for the given IDs
+    images: list[Image] = (
+        db.query(Image)
+        .filter(Image.image_id.in_(payload.image_ids))
+        .all()
+    )
+
+    found_ids = {img.image_id for img in images}
+    not_found_ids = [iid for iid in payload.image_ids if iid not in found_ids]
+
+    results = []
+    for img in images:
+        gcs_deleted = delete_image_instance(img, db)
+        results.append(
+            {
+                "image_id": img.image_id,
+                "gcs_deleted": gcs_deleted,
+            }
+        )
+
+    db.commit()
+
+    return {
+        "status": "ok",
+        "deleted": results,
+        "not_found": not_found_ids,
+    }
+
+
 
 @router.post(
     "/images/cluster",

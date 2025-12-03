@@ -324,6 +324,9 @@ function ImageAdminPage() {
           }
         </Box>
       </Box>
+      <Box>
+        <p>this is is where we will display all images</p>
+      </Box>
     </Box >
   )
 }
