@@ -154,7 +154,7 @@ function ClusterViewerPage() {
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        overflow: 'auto',
+        overflow: 'hidden',
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": {
           display: "none"
@@ -175,7 +175,14 @@ function ClusterViewerPage() {
         </Typography>
       </Box>
 
-      <Box>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         {loading && <p>Loading...</p>}
 
         {!loading && images.length > 0 && (
@@ -213,7 +220,9 @@ function ClusterViewerPage() {
                 display: "flex",
                 flexDirection: "row",
                 padding: "8px",
-                pt: "0px"
+                pt: "0px",
+                flex: 1,
+                minHeight: 0
               }}
             >
               {/* Left panel: list of images in range */}
@@ -222,7 +231,6 @@ function ClusterViewerPage() {
                   flex: 1,
                   borderRight: "1px solid rgba(255,255,255,0.1)",
                   overflowY: "auto",
-                  height: "450px",
                   scrollbarWidth: "none",
                   "&::-webkit-scrollbar": {
                     display: "none"
@@ -253,7 +261,6 @@ function ClusterViewerPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  height: "450px",
                 }}
               >
                 {!selectedImage && (
@@ -323,13 +330,6 @@ function ClusterViewerPage() {
                         </>
                       )}
                     </Box>
-
-                    {/* Metadata */}
-                    <Typography variant="body2" sx={{ mt: 1, textAlign: "center" }}>
-                      Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                      {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type:{" "}
-                      {selectedImage.image_type}
-                    </Typography>
                   </>
                 )}
               </Box>
