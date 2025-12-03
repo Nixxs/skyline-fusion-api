@@ -15,6 +15,7 @@
     "@fontsource/roboto": "^5.2.9",
     "@mui/icons-material": "^7.3.5",
     "@mui/material": "^7.3.5",
+    "@mui/x-data-grid": "^8.20.0",
     "@photo-sphere-viewer/core": "^5.14.0",
     "axios": "^1.13.2",
     "html2canvas": "^1.4.1",

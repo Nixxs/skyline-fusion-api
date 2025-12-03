@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Box,
@@ -7,59 +7,79 @@ import {
   TextField,
   FormControlLabel,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
-import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
-import Tooltip from '@mui/material/Tooltip';
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import { DataGrid } from "@mui/x-data-grid";
 
 function ImageAdminPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // upload/cluster overlay
   const [file, setFile] = useState(null);
   const [maxDistance, setMaxDistance] = useState(200);
   const [maxYawDiff, setMaxYawDiff] = useState(90);
   const [resetExisting, setResetExisting] = useState(true);
   const [responseData, setResponseData] = useState(null);
 
+  // Grid state
+  const [images, setImages] = useState([]);
+  const [rowCount, setRowCount] = useState(0);
+  const [gridLoading, setGridLoading] = useState(false);
+
+  // Use the new paginationModel API (works reliably in v6/v7)
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0, // 0-based for the grid
+    pageSize: 50,
+  });
+
+  // Selection model (Set-based, as per our last working version)
+  const [selectionModel, setSelectionModel] = useState({
+    type: "include",
+    ids: new Set(),
+  });
+
+  const apiBase = import.meta.env.VITE_API_URL;
+
+  // -------------------------
+  // Upload + clustering
+  // -------------------------
   const handleFileChange = (event) => {
-    const selectedFile = event.target.files?.[0];
-    setFile(selectedFile || null);
-
-
+    const selectedFile = event.target.files?.[0] || null;
+    setFile(selectedFile);
     console.log("file set");
-  }
+  };
 
   const handleUpload = async (event) => {
     event.preventDefault();
+    if (!file) return;
+
     setLoading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await axios.post(`${apiBase}/images`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       if (response.status === 201) {
         setResponseData(response.data);
-
-        console.log("submitted file:", file.name)
+        console.log("submitted file:", file.name);
         console.log(response.data);
+        // Refresh grid after upload (reload current page)
+        reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
     } catch (error) {
       console.error(error);
       setResponseData(error);
     } finally {
       setLoading(false);
-      setFile(null)
+      setFile(null);
     }
-  }
+  };
 
   const handleClustering = async (event) => {
     event.preventDefault();
@@ -69,20 +89,20 @@ function ImageAdminPage() {
       max_distance_m: Number(maxDistance),
       max_yaw_diff_deg: Number(maxYawDiff),
       reset_existing: resetExisting,
-    }
+    };
+
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images/cluster`,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${apiBase}/images/cluster`, payload, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       if (response.status === 200) {
         setResponseData(response.data);
+        console.log("sent payload", payload);
+        // Refresh grid if clustering changes image state
+        reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
     } catch (error) {
       console.log(error);
@@ -90,28 +110,133 @@ function ImageAdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // -------------------------
+  // Grid: columns
+  // -------------------------
+  const columns = [
+    {
+      field: "name",
+      headerName: "Name",
+      flex: 1,
+      minWidth: 220,
+    },
+    {
+      field: "image_type",
+      headerName: "Type",
+      width: 110,
+    },
+    {
+      field: "created",
+      headerName: "Captured",
+      width: 190
+    },
+    {
+      field: "imported_utc",
+      headerName: "Imported (UTC)",
+      width: 220
+    },
+    {
+      field: "lon",
+      headerName: "Lon",
+      width: 120
+    },
+    {
+      field: "lat",
+      headerName: "Lat",
+      width: 120
+    },
+    {
+      field: "yaw_deg",
+      headerName: "Yaw (°)",
+      width: 110
+    },
+  ];
+
+  // -------------------------
+  // Grid: data loading
+  // -------------------------
+  const reloadGrid = async (pageArg, pageSizeArg) => {
+    setGridLoading(true);
+    try {
+      const response = await axios.get(`${apiBase}/images`, {
+        params: {
+          page: pageArg + 1, // API is 1-based
+          page_size: pageSizeArg,
+        },
+      });
+
+      const data = response.data;
+      console.log("images response", data);
+
+      const rows = (data.items || []).map((img) => ({
+        id: img.image_id, // DataGrid row id
+        ...img,
+      }));
+
+      setImages(rows);
+      setRowCount(data.total ?? 0);
+    } catch (err) {
+      console.error("Failed to load images", err);
+    } finally {
+      setGridLoading(false);
+    }
+  };
+
+  // reload whenever page or pageSize changes
+  useEffect(() => {
+    reloadGrid(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
+
+  // -------------------------
+  // Grid: delete selected
+  // -------------------------
+  const handleDeleteSelected = async () => {
+    const idsSet = selectionModel.ids;
+    const hasSelection = idsSet && idsSet.size > 0;
+    if (!hasSelection) return;
+
+    const idsToDelete = Array.from(idsSet);
+    console.log("Deleting image_ids:", idsToDelete);
+
+    if (
+      !window.confirm(
+        `Delete ${idsToDelete.length} selected image(s)? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images/cluster`,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      setGridLoading(true);
+      const res = await axios.delete(`${apiBase}/images/batch`, {
+        data: {
+          image_ids: idsToDelete,
+        },
+      });
 
-      if (response.status === 200) {
-        setResponseData(response.data);
-      }
-    } catch (error) {
-      console.log(error);
+      console.log("Delete response:", res.data);
+
+      // Optimistic local update
+      setImages((prev) => prev.filter((row) => !idsSet.has(row.id)));
+      setRowCount((prev) => Math.max(prev - idsToDelete.length, 0));
+
+      // Clear selection
+      setSelectionModel({
+        type: "include",
+        ids: new Set(),
+      });
+    } catch (err) {
+      console.error("Failed to delete images", err);
+      alert("Failed to delete images – check console for details.");
     } finally {
-      setLoading(false);
-      console.log("sent payload", payload);
+      setGridLoading(false);
     }
-  }
+  };
+
+  const selectedCount = selectionModel.ids ? selectionModel.ids.size : 0;
 
   return (
     <Box
@@ -119,26 +244,25 @@ function ImageAdminPage() {
         display: "flex",
         flexDirection: "column",
         padding: 1,
-        maxWidth: 900
+        maxWidth: 900,
       }}
     >
       <Box
         sx={{
           mb: 1,
-          mt: 0
+          mt: 0,
         }}
       >
-        <Typography
-          fontSize={18}
-          fontWeight={600}
-        >
+        <Typography fontSize={18} fontWeight={600}>
           Drone Image Admin
         </Typography>
       </Box>
+
+      {/* Top: upload + clustering + response */}
       <Box
         sx={{
           display: "flex",
-          flexDirection: "row"
+          flexDirection: "row",
         }}
       >
         <Box
@@ -147,7 +271,7 @@ function ImageAdminPage() {
             display: "flex",
             flexDirection: "column",
             maxWidth: 380,
-            position: "relative"
+            position: "relative",
           }}
         >
           <Typography
@@ -157,7 +281,7 @@ function ImageAdminPage() {
               variant: "label",
               pt: "6px",
               mr: 1,
-              mb: 1
+              mb: 1,
             }}
           >
             Upload Images:
@@ -165,7 +289,7 @@ function ImageAdminPage() {
           <Box
             sx={{
               flexDirection: "row",
-              display: "flex"
+              display: "flex",
             }}
           >
             <Tooltip title="Select a .zip of drone images (jpeg,png,tif)">
@@ -173,7 +297,7 @@ function ImageAdminPage() {
                 variant="outlined"
                 component="label"
                 sx={{
-                  flex: 1
+                  flex: 1,
                 }}
               >
                 <FileUploadOutlinedIcon />
@@ -188,12 +312,12 @@ function ImageAdminPage() {
             </Tooltip>
             <Tooltip title="select a file first, then upload from here">
               <Button
-                disabled={file ? false : true}
+                disabled={!file}
                 variant="contained"
                 component="label"
                 sx={{
                   ml: 1,
-                  flex: 1
+                  flex: 1,
                 }}
                 onClick={handleUpload}
               >
@@ -210,7 +334,7 @@ function ImageAdminPage() {
               pt: "6px",
               mr: 1,
               mb: 1,
-              mt: 2
+              mt: 2,
             }}
           >
             Run Clustering:
@@ -219,34 +343,33 @@ function ImageAdminPage() {
             component="form"
             onSubmit={handleClustering}
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
+              display: "flex",
+              flexDirection: "column",
               gap: 2,
               maxWidth: 400,
-              mt: 1
+              mt: 1,
             }}
           >
             <Box
               sx={{
                 display: "flex",
-                flexDirection: "row"
+                flexDirection: "row",
               }}
             >
               <TextField
                 label="Max Distance (m)"
                 type="number"
                 value={maxDistance}
-                onChange={(e) => setMaxDistance(e.target.value)}
-                height="12px"
+                onChange={(e) => setMaxDistance(Number(e.target.value))}
               />
 
               <TextField
                 label="Max Yaw Difference (°)"
                 type="number"
                 value={maxYawDiff}
-                onChange={(e) => setMaxYawDiff(e.target.value)}
+                onChange={(e) => setMaxYawDiff(Number(e.target.value))}
                 sx={{
-                  ml: 1
+                  ml: 1,
                 }}
               />
             </Box>
@@ -260,10 +383,7 @@ function ImageAdminPage() {
               label="Reset existing"
             />
 
-            <Button
-              type="submit"
-              variant="contained"
-            >
+            <Button type="submit" variant="contained">
               Submit
             </Button>
           </Box>
@@ -273,7 +393,6 @@ function ImageAdminPage() {
               sx={{
                 position: "absolute",
                 inset: 0,
-                bgcolor: "rgba(255,255,255,0.7)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -283,52 +402,158 @@ function ImageAdminPage() {
               <CircularProgress />
             </Box>
           )}
-
         </Box>
+
         <Box
           sx={{
             flex: 1,
             display: "flex",
-            backgroundColor: "#F1F1F2",
             borderRadius: 2,
             ml: 1,
             p: 2,
             maxHeight: 310,
-            overflow: 'auto',
+            overflow: "auto",
             scrollbarWidth: "none",
             "&::-webkit-scrollbar": {
-              display: "none"
-            }
+              display: "none",
+            },
           }}
         >
-          {responseData ?
+          {responseData ? (
             <Typography
               fontSize={14}
               sx={{
-                color: "#003366"
+                color: "#FFFFFF",
               }}
               component="pre"
             >
               {JSON.stringify(responseData, null, 2)}
             </Typography>
-            :
+          ) : (
             <Typography
               fontSize={14}
               sx={{
                 margin: "auto",
-                color: "#B4B4B5",
+                color: "#FFFFFF",
               }}
             >
               please run an admin operation.
             </Typography>
-          }
+          )}
         </Box>
       </Box>
-      <Box>
-        <p>this is is where we will display all images</p>
+
+      {/* Bottom: DataGrid */}
+      <Box
+        sx={{
+          mt: 2,
+          display: "flex",
+          flexDirection: "column",
+          height: 450,
+        }}
+      >
+        <Box
+          sx={{
+            mb: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography fontSize={16} fontWeight={500}>
+            All Images
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            disabled={selectedCount === 0 || gridLoading}
+            onClick={handleDeleteSelected}
+          >
+            Delete selected ({selectedCount})
+          </Button>
+        </Box>
+        <DataGrid
+          rows={images}
+          columns={columns}
+          checkboxSelection
+          disableRowSelectionOnClick
+          disableRowSelectionExcludeModel
+          paginationMode="server"
+          rowCount={rowCount}
+          loading={gridLoading}
+          // NEW pagination wiring
+          paginationModel={paginationModel}
+          onPaginationModelChange={(newModel) => {
+            // reset selection when changing page/size
+            setSelectionModel({
+              type: "include",
+              ids: new Set(),
+            });
+            setPaginationModel(newModel);
+          }}
+          // selection wiring (as before)
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(newSelectionModel) => {
+            console.log("New selection model:", newSelectionModel);
+            setSelectionModel(newSelectionModel);
+          }}
+          density="compact"
+          sx={{
+            backgroundColor: "#F1F1F2",
+            color: "#000",
+            borderRadius: 2,
+
+            /* HEADER */
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+              borderBottom: "1px solid #BDBDBD",
+            },
+            "& .MuiDataGrid-columnHeader": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+            },
+            "& .MuiDataGrid-columnHeaderTitle": {
+              color: "#000 !important",
+              fontWeight: 600,
+            },
+
+            /* FOOTER */
+            "& .MuiDataGrid-footerContainer": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+              borderTop: "1px solid #BDBDBD",
+            },
+
+            /* ROW STRIPING */
+            "& .MuiDataGrid-row:nth-of-type(odd)": {
+              backgroundColor: "#FFFFFF",
+            },
+            "& .MuiDataGrid-row:nth-of-type(even)": {
+              backgroundColor: "#F9F9F9",
+            },
+
+            "& .MuiDataGrid-cell": {
+              borderColor: "#DDD",
+              color: "#000",
+            },
+
+            /* HOVER + SELECTION */
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: "#EEF3FF !important",
+            },
+            "& .MuiDataGrid-row.Mui-selected": {
+              backgroundColor: "#D6E4FF !important",
+            },
+            "& .MuiDataGrid-row.Mui-selected:hover": {
+              backgroundColor: "#C7D8FF !important",
+            },
+          }}
+        />
       </Box>
-    </Box >
-  )
+    </Box>
+  );
 }
 
 export default ImageAdminPage;
