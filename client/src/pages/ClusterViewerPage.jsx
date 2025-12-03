@@ -349,7 +349,16 @@ function ClusterViewerPage() {
                       {selectedImage.image_type !== "pano" ? (
                         <ImageViewer selectedImage={selectedImage} />
                       ) : (
-                        <PanoViewer src={selectedImage.signed_url} />
+                        <PanoViewer
+                          src={selectedImage.signed_url}
+                          onViewChange={({ yaw, pitch, fov }) => {
+                            // yaw/pitch are radians
+                            // fov is in degrees (v5)
+                            // Convert if you want degrees
+                            const toDeg = (r) => (r * 180) / Math.PI;
+                            console.log("Yaw°", toDeg(yaw), "Pitch°", toDeg(pitch), "FOV°", fov);
+                          }}
+                        />
                       )}
 
                       {/* Previous button (left) */}

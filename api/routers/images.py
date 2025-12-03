@@ -3,6 +3,7 @@ import logging
 import uuid
 import zipfile
 import os
+import shutil
 from typing import cast, List
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
@@ -14,7 +15,7 @@ from api.db.models import Image, ImageClass, ImageLookup
 from api.utils.file_handler import save_file
 from api.utils.exif import extract_exif_geo
 from pathlib import Path
-from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
+from api.utils.gcp import handle_gcs_image_upload, generate_signed_url, delete_gcs_image
 from api.utils.image_classification import cluster_images_by_distance
 from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
@@ -128,21 +129,6 @@ async def create_images(
     ),
     db: Session = Depends(get_db),
 ):
-    """
-    Upload a zip file containing multiple drone images.
-
-    **Request format (multipart/form-data)**
-
-    - `file`: binary zip file containing the images (e.g. JPEG from the drone)
-
-    **Behaviour**
-
-    1. The uploaded ZIP is written under the configured data path (e.g. `data/images/`).
-    2. The ZIP is extracted into a batch folder.
-    3. EXIF GPS metadata is read from each extracted image.
-    4. A row is inserted into `images` for each valid image.
-    5. All created records and file paths are returned.
-    """
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Uploaded file must be a .zip archive")
 
@@ -160,30 +146,44 @@ async def create_images(
     created_images: list[Image] = []
     file_paths: list[str] = []
 
+    IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
+
     try:
+        # 1) Extract everything first
         with zipfile.ZipFile(zip_path_obj, "r") as zf:
-            for member in zf.namelist():
-                # Skip directories
-                if member.endswith("/"):
+            zf.extractall(extract_dir)
+            logger.info(f"Extracted ZIP to {extract_dir}")
+
+        # 2) Walk the extracted tree recursively
+        for root, dirs, files in os.walk(extract_dir):
+            for filename in files:
+                if not filename.lower().endswith(IMAGE_EXTENSIONS):
+                    rel = Path(root, filename).relative_to(extract_dir)
+                    logger.info(f"Skipping non-image file in zip tree: {rel}")
                     continue
 
-                # Only process likely image files
-                if not member.lower().endswith((".jpg", ".jpeg", ".png", ".tif", ".tiff")):
-                    logger.info(f"Skipping non-image file in zip: {member}")
-                    continue
-
-                # Extract file
-                extracted_path = zf.extract(member, path=extract_dir)
-                extracted_path_obj = Path(extracted_path)
+                extracted_path_obj = Path(root) / filename
+                rel_path = extracted_path_obj.relative_to(extract_dir)
                 file_paths.append(str(extracted_path_obj))
-                logger.info(f"Extracted image {member} to {extracted_path_obj}")
+                logger.info(f"Found image {rel_path} at {extracted_path_obj}")
 
                 # Extract EXIF geo info
-                exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov = extract_exif_geo(
-                    str(extracted_path_obj)
-                )
+                (
+                    exif_name,
+                    exif_lon,
+                    exif_lat,
+                    exif_alt,
+                    exif_yaw,
+                    created,
+                    geom,
+                    image_type,
+                    pitch,
+                    hfov,
+                    vfov,
+                ) = extract_exif_geo(str(extracted_path_obj))
+
                 logger.info(
-                    f"EXIF for {member}: "
+                    f"EXIF for {rel_path}: "
                     f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
                 )
 
@@ -204,7 +204,7 @@ async def create_images(
                     image_type=image_type,
                     pitch=pitch,
                     hfov=hfov,
-                    vfov=vfov
+                    vfov=vfov,
                 )
 
                 db.add(image)
@@ -217,7 +217,8 @@ async def create_images(
         for img in created_images:
             db.refresh(img)
 
-        os.rmdir(extract_dir)
+        # Clean up extracted tree + zip
+        shutil.rmtree(extract_dir, ignore_errors=True)
         os.remove(zip_path)
 
         return CreateImagesOut(
@@ -228,6 +229,10 @@ async def create_images(
 
     except zipfile.BadZipFile:
         logger.exception("Uploaded file is not a valid ZIP")
+        # best-effort cleanup
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        if zip_path_obj.exists():
+            os.remove(zip_path)
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid ZIP archive")
 
 @router.get("/image/{image_id}", status_code=200, response_model=GetImageOut)
@@ -244,6 +249,58 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     image_out = image_out.model_copy(update={"signed_url": signed_url})
 
     return image_out
+
+@router.delete("/image/{image_id}", status_code=200)
+def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
+    """
+    Delete an image by ID.
+
+    Behaviour:
+    - Look up the image in the `images` table.
+    - Delete any `image_lookup` rows referencing this image.
+    - Optionally decrement `image_count` on related `image_classes`.
+    - Delete the image row itself.
+    - Delete the corresponding object from Google Cloud Storage.
+    """
+    image: Image | None = (
+        db.query(Image)
+        .filter(Image.image_id == image_id)
+        .first()
+    )
+
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    object_name = image.object_name
+
+    # Delete lookup rows + maintain image_count on classes
+    lookups: list[ImageLookup] = (
+        db.query(ImageLookup)
+          .filter(ImageLookup.image_id == image_id)
+          .all()
+    )
+
+    for lk in lookups:
+        if lk.image_class is not None:
+            ic = lk.image_class
+            ic.image_count = max((ic.image_count or 0) - 1, 0)
+
+        db.delete(lk)
+
+    # Delete the image row
+    db.delete(image)
+
+    # Try to delete from GCS; if it fails, we still commit DB change
+    try:
+        if str(object_name):
+            delete_gcs_image(str(object_name))
+    except Exception as exc:
+        # Log but don't block the DB delete
+        logger.exception(f"Failed to delete GCS object {object_name}: {exc}")
+
+    db.commit()
+
+    return {"status": "ok", "deleted_image_id": image_id}
 
 @router.post(
     "/images/cluster",

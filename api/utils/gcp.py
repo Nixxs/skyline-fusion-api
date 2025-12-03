@@ -144,3 +144,15 @@ def ensure_bucket_cors(extra_origins: list[str] | None = None) -> None:
     bucket.cors = desired_cors
     bucket.patch()
     logger.info("CORS configuration updated on bucket %s", bucket.name)
+
+def delete_gcs_image(object_name: str) -> None:
+    """
+    Delete an image object from the configured GCS bucket.
+    """
+    client = storage.Client()
+    bucket = client.bucket(config.GCS_IMAGES_BUCKET)
+    blob = bucket.blob(object_name)
+
+    # blob.delete() is idempotent: if not found, it raises NotFound; you can catch/log if you want
+    blob.delete()
+
