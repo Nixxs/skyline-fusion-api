@@ -250,19 +250,20 @@ function ImageAdminPage() {
       <Box
         sx={{
           mb: 1,
-          mt: 0,
+          mt: 0
         }}
       >
-        <Typography fontSize={18} fontWeight={600}>
+        <Typography
+          fontSize={18}
+          fontWeight={600}
+        >
           Drone Image Admin
         </Typography>
       </Box>
-
-      {/* Top: upload + clustering + response */}
       <Box
         sx={{
           display: "flex",
-          flexDirection: "row",
+          flexDirection: "row"
         }}
       >
         <Box
@@ -271,7 +272,7 @@ function ImageAdminPage() {
             display: "flex",
             flexDirection: "column",
             maxWidth: 380,
-            position: "relative",
+            position: "relative"
           }}
         >
           <Typography
@@ -281,7 +282,7 @@ function ImageAdminPage() {
               variant: "label",
               pt: "6px",
               mr: 1,
-              mb: 1,
+              mb: 1
             }}
           >
             Upload Images:
@@ -289,7 +290,7 @@ function ImageAdminPage() {
           <Box
             sx={{
               flexDirection: "row",
-              display: "flex",
+              display: "flex"
             }}
           >
             <Tooltip title="Select a .zip of drone images (jpeg,png,tif)">
@@ -297,7 +298,7 @@ function ImageAdminPage() {
                 variant="outlined"
                 component="label"
                 sx={{
-                  flex: 1,
+                  flex: 1
                 }}
               >
                 <FileUploadOutlinedIcon />
@@ -312,12 +313,12 @@ function ImageAdminPage() {
             </Tooltip>
             <Tooltip title="select a file first, then upload from here">
               <Button
-                disabled={!file}
+                disabled={file ? false : true}
                 variant="contained"
                 component="label"
                 sx={{
                   ml: 1,
-                  flex: 1,
+                  flex: 1
                 }}
                 onClick={handleUpload}
               >
@@ -334,7 +335,7 @@ function ImageAdminPage() {
               pt: "6px",
               mr: 1,
               mb: 1,
-              mt: 2,
+              mt: 2
             }}
           >
             Run Clustering:
@@ -343,33 +344,34 @@ function ImageAdminPage() {
             component="form"
             onSubmit={handleClustering}
             sx={{
-              display: "flex",
-              flexDirection: "column",
+              display: 'flex',
+              flexDirection: 'column',
               gap: 2,
               maxWidth: 400,
-              mt: 1,
+              mt: 1
             }}
           >
             <Box
               sx={{
                 display: "flex",
-                flexDirection: "row",
+                flexDirection: "row"
               }}
             >
               <TextField
                 label="Max Distance (m)"
                 type="number"
                 value={maxDistance}
-                onChange={(e) => setMaxDistance(Number(e.target.value))}
+                onChange={(e) => setMaxDistance(e.target.value)}
+                height="12px"
               />
 
               <TextField
                 label="Max Yaw Difference (°)"
                 type="number"
                 value={maxYawDiff}
-                onChange={(e) => setMaxYawDiff(Number(e.target.value))}
+                onChange={(e) => setMaxYawDiff(e.target.value)}
                 sx={{
-                  ml: 1,
+                  ml: 1
                 }}
               />
             </Box>
@@ -383,7 +385,10 @@ function ImageAdminPage() {
               label="Reset existing"
             />
 
-            <Button type="submit" variant="contained">
+            <Button
+              type="submit"
+              variant="contained"
+            >
               Submit
             </Button>
           </Box>
@@ -393,6 +398,7 @@ function ImageAdminPage() {
               sx={{
                 position: "absolute",
                 inset: 0,
+                bgcolor: "rgba(255,255,255,0.7)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -402,44 +408,45 @@ function ImageAdminPage() {
               <CircularProgress />
             </Box>
           )}
-        </Box>
 
+        </Box>
         <Box
           sx={{
             flex: 1,
             display: "flex",
+            backgroundColor: "#F1F1F2",
             borderRadius: 2,
             ml: 1,
             p: 2,
             maxHeight: 310,
-            overflow: "auto",
+            overflow: 'auto',
             scrollbarWidth: "none",
             "&::-webkit-scrollbar": {
-              display: "none",
-            },
+              display: "none"
+            }
           }}
         >
-          {responseData ? (
+          {responseData ?
             <Typography
               fontSize={14}
               sx={{
-                color: "#FFFFFF",
+                color: "#003366"
               }}
               component="pre"
             >
               {JSON.stringify(responseData, null, 2)}
             </Typography>
-          ) : (
+            :
             <Typography
               fontSize={14}
               sx={{
                 margin: "auto",
-                color: "#FFFFFF",
+                color: "#B4B4B5",
               }}
             >
               please run an admin operation.
             </Typography>
-          )}
+          }
         </Box>
       </Box>
 
