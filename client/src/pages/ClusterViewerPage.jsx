@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -11,16 +11,18 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import PanoViewer from "../components/PanoViewer";
-import TerraExplorerControls from "../components/TerraExplorerControls";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ImageViewer from "../components/ImageViewer";
+import html2canvas from "html2canvas";
+import DownloadIcon from "@mui/icons-material/Download";
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const viewerRef = useRef(null);
 
   const [timeBounds, setTimeBounds] = useState([0, 0]);
   const [timeRange, setTimeRange] = useState([0, 0]);
@@ -146,6 +148,28 @@ function ClusterViewerPage() {
       minute: "2-digit",
       second: "2-digit"
     });
+  };
+
+  const handleScreenshot = async () => {
+    if (!viewerRef.current) return;
+
+    // Temporarily hide any overlay buttons
+    const buttons = viewerRef.current.querySelectorAll(".overlay-button");
+    buttons.forEach((el) => (el.style.display = "none"));
+
+    const canvas = await html2canvas(viewerRef.current, {
+      useCORS: true,      // important if loading external images
+      backgroundColor: null,
+      scale: 2,           // hi-res screenshot
+    });
+
+    // Re-show buttons
+    buttons.forEach((el) => (el.style.display = ""));
+
+    const link = document.createElement("a");
+    link.download = `${selectedImage.name.replace(/\W+/g, "_")}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   };
 
   return (
@@ -283,7 +307,22 @@ function ClusterViewerPage() {
                         borderRadius: 1,
                         border: "1px solid rgba(255,255,255,0.1)",
                       }}
+                      ref={viewerRef}
                     >
+                      <IconButton
+                        onClick={handleScreenshot}
+                        className="overlay-button"
+                        sx={{
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          zIndex: 10,
+                          backgroundColor: "rgba(0,0,0,0.2)",
+                        }}
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+
                       {selectedImage.image_type !== "pano" ? (
                         <ImageViewer selectedImage={selectedImage} />
                       ) : (

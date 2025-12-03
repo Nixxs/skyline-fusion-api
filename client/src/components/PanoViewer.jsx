@@ -17,9 +17,9 @@ export default function PanoViewer({ src }) {
         height="100%"
         width="100%"
         navbar={true}
-        minFov={10}     // allow very deep zoom (default ~30-50)
+        minFov={1}     // allow very deep zoom (default ~30-50)
         maxFov={120}    // wide angle zoom out more if desired
-        defaultZoomLvl={0} // 0 = allow full zoom range
+        defaultZoomLvl={50} // 0 = allow full zoom range
       />
     </Box>
   );
