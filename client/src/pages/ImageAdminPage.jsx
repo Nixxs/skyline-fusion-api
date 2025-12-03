@@ -16,8 +16,8 @@ import { DataGrid } from "@mui/x-data-grid";
 function ImageAdminPage() {
   const [loading, setLoading] = useState(false); // upload/cluster overlay
   const [file, setFile] = useState(null);
-  const [maxDistance, setMaxDistance] = useState(200);
-  const [maxYawDiff, setMaxYawDiff] = useState(90);
+  const [maxDistance, setMaxDistance] = useState(2);
+  const [maxYawDiff, setMaxYawDiff] = useState(5);
   const [resetExisting, setResetExisting] = useState(true);
   const [responseData, setResponseData] = useState(null);
 
@@ -244,7 +244,7 @@ function ImageAdminPage() {
         display: "flex",
         flexDirection: "column",
         padding: 1,
-        maxWidth: 900,
+        maxWidth: 1200,
       }}
     >
       <Box
@@ -456,7 +456,7 @@ function ImageAdminPage() {
           mt: 2,
           display: "flex",
           flexDirection: "column",
-          height: 450,
+          height: 510,
         }}
       >
         <Box
