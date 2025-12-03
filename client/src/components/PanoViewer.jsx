@@ -20,6 +20,11 @@ export default function PanoViewer({ src }) {
         minFov={1}     // allow very deep zoom (default ~30-50)
         maxFov={120}    // wide angle zoom out more if desired
         defaultZoomLvl={50} // 0 = allow full zoom range
+        rendererParameters={{
+          alpha: true,
+          antialias: true,
+          preserveDrawingBuffer: true,   // <- key bit for screenshots
+        }}
       />
     </Box>
   );
