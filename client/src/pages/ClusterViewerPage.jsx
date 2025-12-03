@@ -1,22 +1,28 @@
-
 import { useParams } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
   List,
   ListItemButton,
   ListItemText,
-  Slider
+  Slider,
+  IconButton
 } from "@mui/material";
 import axios from "axios";
 import PanoViewer from "../components/PanoViewer";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ImageViewer from "../components/ImageViewer";
+import html2canvas from "html2canvas";
+import DownloadIcon from "@mui/icons-material/Download";
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const viewerRef = useRef(null);
 
   const [timeBounds, setTimeBounds] = useState([0, 0]);
   const [timeRange, setTimeRange] = useState([0, 0]);
@@ -41,7 +47,7 @@ function ClusterViewerPage() {
         }));
 
         // Sort by time ascending
-        imgs.sort((a, b) => a.createdMs - b.createdMs);
+        imgs.sort((a, b) => b.createdMs - a.createdMs);
 
         setImages(imgs);
 
@@ -64,6 +70,39 @@ function ClusterViewerPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goToNextImage = () => {
+    if (!selectedImage || filteredImages.length === 0) return;
+
+    const currentIndex = filteredImages.findIndex(
+      (img) => img.image_id === selectedImage.image_id
+    );
+
+    if (currentIndex === -1) {
+      setSelectedImage(filteredImages[0]);
+      return;
+    }
+
+    const nextIndex = (currentIndex + 1) % filteredImages.length; // wrap around
+    setSelectedImage(filteredImages[nextIndex]);
+  };
+
+  const goToPreviousImage = () => {
+    if (!selectedImage || filteredImages.length === 0) return;
+
+    const currentIndex = filteredImages.findIndex(
+      (img) => img.image_id === selectedImage.image_id
+    );
+
+    if (currentIndex === -1) {
+      setSelectedImage(filteredImages[0]);
+      return;
+    }
+
+    const prevIndex =
+      (currentIndex - 1 + filteredImages.length) % filteredImages.length; // wrap around
+    setSelectedImage(filteredImages[prevIndex]);
   };
 
   useEffect(() => {
@@ -101,14 +140,58 @@ function ClusterViewerPage() {
   const formatTime = (ms) => {
     if (!ms) return "";
     const d = new Date(ms);
-    return d.toLocaleTimeString([], {
-      day: "2-digit",
+    return d.toLocaleTimeString("en-AU", {
+      weekday: "long",
       month: "short",
+      day: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit"
+      second: "2-digit",
+      hour12: true
     });
+  };
+
+  const formatDayDate = (ms) => {
+    if (!ms) return "";
+    return new Date(ms).toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatTimeOnly = (ms) => {
+    if (!ms) return "";
+    return new Date(ms).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const handleScreenshot = async () => {
+    if (!viewerRef.current) return;
+
+    // Temporarily hide any overlay buttons
+    const buttons = viewerRef.current.querySelectorAll(".overlay-button");
+    buttons.forEach((el) => (el.style.display = "none"));
+
+    const canvas = await html2canvas(viewerRef.current, {
+      useCORS: true,      // important if loading external images
+      backgroundColor: null,
+      scale: 2,           // hi-res screenshot
+    });
+
+    // Re-show buttons
+    buttons.forEach((el) => (el.style.display = ""));
+
+    const link = document.createElement("a");
+    link.download = `${selectedImage.name.replace(/\W+/g, "_")}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   };
 
   return (
@@ -117,7 +200,7 @@ function ClusterViewerPage() {
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        overflow: 'auto',
+        overflow: 'hidden',
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": {
           display: "none"
@@ -134,11 +217,18 @@ function ClusterViewerPage() {
             paddingBottom: "0px"
           }}
         >
-          Image Cluster: {cluster_id}
+          Time Range:
         </Typography>
       </Box>
 
-      <Box>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         {loading && <p>Loading...</p>}
 
         {!loading && images.length > 0 && (
@@ -146,7 +236,7 @@ function ClusterViewerPage() {
             {/* Time slider */}
             <Box sx={{ px: 2, pb: 0 }}>
               <Typography variant="body2" sx={{ mb: 1, ml: -1 }}>
-                Time range: {formatTime(timeRange[0])} – {formatTime(timeRange[1])}
+                {formatTime(timeRange[0])} – {formatTime(timeRange[1])}
               </Typography>
               <Slider
                 value={timeRange}
@@ -176,7 +266,9 @@ function ClusterViewerPage() {
                 display: "flex",
                 flexDirection: "row",
                 padding: "8px",
-                pt: "0px"
+                pt: "0px",
+                flex: 1,
+                minHeight: 0
               }}
             >
               {/* Left panel: list of images in range */}
@@ -185,8 +277,8 @@ function ClusterViewerPage() {
                   flex: 1,
                   borderRight: "1px solid rgba(255,255,255,0.1)",
                   overflowY: "auto",
-                  height: "450px",
                   scrollbarWidth: "none",
+                  maxWidth: "300px",
                   "&::-webkit-scrollbar": {
                     display: "none"
                   }
@@ -200,8 +292,8 @@ function ClusterViewerPage() {
                       onClick={() => setSelectedImage(img)}
                     >
                       <ListItemText
-                        primary={img.name}
-                        secondary={img.created}
+                        primary={formatDayDate(img.createdMs)}
+                        secondary={formatTimeOnly(img.createdMs)}
                       />
                     </ListItemButton>
                   ))}
@@ -211,13 +303,11 @@ function ClusterViewerPage() {
               {/* Right panel: selected image */}
               <Box
                 sx={{
-                  flex: 3,
+                  flex: 5,
                   padding: "8px",
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  height: "450px"
-                  //maxHeight: "365px"
                 }}
               >
                 {!selectedImage && (
@@ -227,48 +317,82 @@ function ClusterViewerPage() {
                 )}
 
                 {selectedImage && (
-                  selectedImage.image_type !== "pano" ? (
-                    <>
-                      <Box
+                  <>
+                    {/* Viewer container with overlay arrows */}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        flex: 5,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                        borderRadius: 1,
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                      ref={viewerRef}
+                    >
+                      <IconButton
+                        onClick={handleScreenshot}
+                        className="overlay-button"
                         sx={{
-                          flex: 5,
-                          //height: "450px",     // matches left panel
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
-                          borderRadius: 1,
-                          border: "1px solid rgba(255,255,255,0.1)"
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          zIndex: 10,
+                          backgroundColor: "rgba(0,0,0,0.2)",
                         }}
-                        onClick={() => window.open(selectedImage.signed_url, "_blank", "noopener,noreferrer")}
                       >
-                        <Box
-                          component="img"
-                          src={selectedImage.signed_url}
-                          alt={selectedImage.name}
-                          sx={{
-                            maxWidth: "100%",
-                            maxHeight: "100%",
-                            objectFit: "contain",
-                            cursor: "pointer"
-                          }}
-                        />
-                      </Box>
+                        <DownloadIcon />
+                      </IconButton>
 
-                      <Typography variant="body2" sx={{ mt: 1, flex: 1, textAlign: "center" }}>
-                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
-                      </Typography>
-                    </>
-                  ) : (
-                    <>
-                      <PanoViewer src={selectedImage.signed_url} />
-                      <Typography variant="body2" sx={{ mt: 1, flex: 1 }}>
-                        Lon: {selectedImage.lon}, Lat: {selectedImage.lat}, Alt:{" "}
-                        {selectedImage.alt_m} m, Yaw: {selectedImage.yaw_deg}°, Type: {selectedImage.image_type}
-                      </Typography>
-                    </>
-                  )
+                      {selectedImage.image_type !== "pano" ? (
+                        <ImageViewer selectedImage={selectedImage} />
+                      ) : (
+                        <PanoViewer src={selectedImage.signed_url} />
+                      )}
+
+                      {/* Previous button (left) */}
+                      {filteredImages.length > 1 && (
+                        <>
+                          <IconButton
+                            onClick={goToPreviousImage}
+                            size="large"
+                            sx={{
+                              position: "absolute",
+                              left: 8,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              backgroundColor: "rgba(0,0,0,0.1)",
+                              "&:hover": {
+                                backgroundColor: "rgba(0,0,0,0.4)",
+                              },
+                            }}
+                          >
+                            <ChevronLeftIcon />
+                          </IconButton>
+
+                          {/* Next button (right) */}
+                          <IconButton
+                            onClick={goToNextImage}
+                            size="large"
+                            sx={{
+                              position: "absolute",
+                              right: 8,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              backgroundColor: "rgba(0,0,0,0.1)",
+                              "&:hover": {
+                                backgroundColor: "rgba(0,0,0,0.2)",
+                              },
+                            }}
+                          >
+                            <ChevronRightIcon />
+                          </IconButton>
+                        </>
+                      )}
+                    </Box>
+                  </>
                 )}
               </Box>
             </Box>
