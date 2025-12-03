@@ -14,6 +14,7 @@ import PanoViewer from "../components/PanoViewer";
 import TerraExplorerControls from "../components/TerraExplorerControls";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ImageViewer from "../components/ImageViewer";
 
 function ClusterViewerPage() {
   const { cluster_id } = useParams();
@@ -277,24 +278,7 @@ function ClusterViewerPage() {
                       }}
                     >
                       {selectedImage.image_type !== "pano" ? (
-                        <Box
-                          component="img"
-                          src={selectedImage.signed_url}
-                          alt={selectedImage.name}
-                          sx={{
-                            maxWidth: "100%",
-                            maxHeight: "100%",
-                            objectFit: "contain",
-                            cursor: "pointer",
-                          }}
-                          onClick={() =>
-                            window.open(
-                              selectedImage.signed_url,
-                              "_blank",
-                              "noopener,noreferrer"
-                            )
-                          }
-                        />
+                        <ImageViewer selectedImage={selectedImage} />
                       ) : (
                         <PanoViewer src={selectedImage.signed_url} />
                       )}
