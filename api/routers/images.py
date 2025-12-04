@@ -74,7 +74,7 @@ async def create_image(
     logger.info(f"Saved uploaded image to {file_path}")
 
     # Extract EXIF geo info
-    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov = extract_exif_geo(file_path)
+    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov, target_range, target_lon, target_lat = extract_exif_geo(file_path)
     logger.info(
         f"EXIF for {file.filename}: "
         f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
@@ -97,7 +97,10 @@ async def create_image(
         image_type=image_type,
         pitch=pitch,
         hfov=hfov,
-        vfov=vfov
+        vfov=vfov,
+        target_range=target_range,
+        target_lon=target_lon,
+        target_lat=target_lat
     )
 
     db.add(image)
@@ -181,6 +184,9 @@ async def create_images(
                     pitch,
                     hfov,
                     vfov,
+                    target_range, 
+                    target_lon, 
+                    target_lat
                 ) = extract_exif_geo(str(extracted_path_obj))
 
                 logger.info(
@@ -206,6 +212,9 @@ async def create_images(
                     pitch=pitch,
                     hfov=hfov,
                     vfov=vfov,
+                    target_range=target_range,
+                    target_lon=target_lon,
+                    target_lat=target_lat
                 )
 
                 db.add(image)
@@ -470,6 +479,10 @@ def cluster_images_endpoint(
         pitchs = [img.pitch for img in cluster if img.pitch is not None]
         hfovs = [img.hfov for img in cluster if img.hfov is not None]
         vfovs = [img.vfov for img in cluster if img.vfov is not None]
+        target_ranges = [img.target_range for img in cluster if img.target_range is not None]
+        target_lats = [img.target_lat for img in cluster if img.target_lat is not None]
+        target_lons = [img.target_lon for img in cluster if img.target_lon is not None]
+
         image_types = list(set([img.image_type for img in cluster if img.image_type is not None]))
 
         avg_alt = sum(alts) / len(alts) if alts else None
@@ -477,6 +490,12 @@ def cluster_images_endpoint(
         avg_pitch = sum(pitchs) / len(pitchs) if pitchs else None
         avg_hfov = sum(hfovs) / len(hfovs) if hfovs else None
         avg_vfov = sum(vfovs) / len(vfovs) if vfovs else None
+        
+        avg_target_range = sum(target_ranges) / len(target_ranges) if target_ranges else None
+        avg_target_lat = sum(target_lats) / len(target_lats) if target_lats else None
+        avg_target_lon = sum(target_lons) / len(target_lons) if target_lons else None
+
+
         image_type = image_types[0] if len(image_types) == 1 else "multiple"
 
         class_id = str(uuid.uuid4())
@@ -494,7 +513,10 @@ def cluster_images_endpoint(
             image_type=image_type,
             pitch=avg_pitch,
             hfov=avg_hfov,
-            vfov=avg_vfov
+            vfov=avg_vfov,
+            target_range=avg_target_range,
+            target_lat=avg_target_lat,
+            target_lon=avg_target_lon
         )
         db.add(image_class)
 
@@ -566,7 +588,10 @@ def get_cluster_by_id(cluster_id: str, db: Session = Depends(get_db)):
                 image_type=image.image_type,
                 pitch=image.pitch,
                 hfov=image.hfov,
-                vfov=image.vfov
+                vfov=image.vfov,
+                target_range=image.target_range,
+                target_lat=image.target_lat,
+                target_lon=image.target_lon
             )
         )
 

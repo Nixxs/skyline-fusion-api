@@ -160,6 +160,21 @@ function ImageAdminPage() {
       headerName: "Yaw (°)",
       width: 110
     },
+    {
+      field: "target_range",
+      headerName: "Target Range",
+      width: 110
+    },
+    {
+      field: "target_lon",
+      headerName: "Target Lon",
+      width: 110
+    },
+    {
+      field: "target_lat",
+      headerName: "Target Lat",
+      width: 110
+    }
   ];
 
   // -------------------------

@@ -22,7 +22,10 @@ def extract_exif_geo(file_path: str) -> Tuple[
         Optional[str], 
         Optional[float],
         Optional[float],
-        Optional[float]
+        Optional[float],
+        Optional[float],
+        Optional[float],
+        Optional[float],
     ]:
     """
     Read EXIF from an image file and return (name, lon, lat, alt_m, yaw_deg, created).
@@ -48,9 +51,13 @@ def extract_exif_geo(file_path: str) -> Tuple[
 
             hfov, vfov = compute_hv_fov(cfov, width_px, height_px)
 
-            return name, lon, lat, alt, yaw, created, geom, image_type, pitch, hfov, vfov
+            target_range = metadata.get("XMP:LRFTargetDistance")
+            target_lon = metadata.get("XMP:LRFTargetLon")
+            target_lat = metadata.get("XMP:LRFTargetLat")
+
+            return name, lon, lat, alt, yaw, created, geom, image_type, pitch, hfov, vfov, target_range, target_lon, target_lat
 
     except Exception as e:
         # If anything goes wrong, fail soft
         logger.warning(f"Failed to extract EXIF from {file_path}: {e}")
-        return None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, None, None

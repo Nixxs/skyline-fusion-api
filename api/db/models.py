@@ -22,6 +22,9 @@ class Image(Base):
     hfov = Column(Float)
     vfov = Column(Float)
     pitch = Column(Float)
+    target_range = Column(Float)
+    target_lon = Column(Float)
+    target_lat = Column(Float)
 
     # relationships
     classes = relationship("ImageLookup", back_populates="image")
@@ -43,6 +46,9 @@ class ImageClass(Base):
     hfov = Column(Float)
     vfov = Column(Float)
     pitch = Column(Float)
+    target_range = Column(Float)
+    target_lon = Column(Float)
+    target_lat = Column(Float)
 
     images = relationship("ImageLookup", back_populates="image_class")
 
