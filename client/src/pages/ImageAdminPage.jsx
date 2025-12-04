@@ -596,86 +596,116 @@ function ImageAdminPage() {
             Delete selected ({selectedCount})
           </Button>
         </Box>
-        <DataGrid
-          rows={images}
-          columns={columns}
-          checkboxSelection
-          disableRowSelectionOnClick
-          disableRowSelectionExcludeModel
-          paginationMode="server"
-          rowCount={rowCount}
-          loading={gridLoading}
-          // NEW pagination wiring
-          paginationModel={paginationModel}
-          onPaginationModelChange={(newModel) => {
-            // reset selection when changing page/size
-            setSelectionModel({
-              type: "include",
-              ids: new Set(),
-            });
-            setPaginationModel(newModel);
-          }}
-          // selection wiring (as before)
-          rowSelectionModel={selectionModel}
-          onRowSelectionModelChange={(newSelectionModel) => {
-            console.log("New selection model:", newSelectionModel);
-            setSelectionModel(newSelectionModel);
-          }}
-          density="compact"
+        <Box
           sx={{
-            flexGrow: 1,
-            height: "100%",
-            backgroundColor: "#F1F1F2",
-            color: "#000",
-            borderRadius: 2,
-
-            /* HEADER */
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-              borderBottom: "1px solid #BDBDBD",
-            },
-            "& .MuiDataGrid-columnHeader": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-            },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              color: "#000 !important",
-              fontWeight: 600,
-            },
-
-            /* FOOTER */
-            "& .MuiDataGrid-footerContainer": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-              borderTop: "1px solid #BDBDBD",
-            },
-
-            /* ROW STRIPING */
-            "& .MuiDataGrid-row:nth-of-type(odd)": {
-              backgroundColor: "#FFFFFF",
-            },
-            "& .MuiDataGrid-row:nth-of-type(even)": {
-              backgroundColor: "#F9F9F9",
-            },
-
-            "& .MuiDataGrid-cell": {
-              borderColor: "#DDD",
-              color: "#000",
-            },
-
-            /* HOVER + SELECTION */
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: "#EEF3FF !important",
-            },
-            "& .MuiDataGrid-row.Mui-selected": {
-              backgroundColor: "#D6E4FF !important",
-            },
-            "& .MuiDataGrid-row.Mui-selected:hover": {
-              backgroundColor: "#C7D8FF !important",
-            },
+            display: "flex",
+            flex: 1,         // ⬅ fill remaining vertical space
+            minHeight: 0,    // ⬅ allow inner boxes to shrink and have internal scroll
+            overflow: "hidden",
           }}
-        />
+        >
+          <Box
+            sx={{
+              flex: 2,        // ⬅ give grid more space than right panel
+              minWidth: 0,    // ⬅ allow proper flex overflow handling
+              minHeight: 0,
+              mr: 1,
+            }}
+          >
+            <DataGrid
+              rows={images}
+              columns={columns}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableRowSelectionExcludeModel
+              paginationMode="server"
+              rowCount={rowCount}
+              loading={gridLoading}
+              // NEW pagination wiring
+              paginationModel={paginationModel}
+              onPaginationModelChange={(newModel) => {
+                // reset selection when changing page/size
+                setSelectionModel({
+                  type: "include",
+                  ids: new Set(),
+                });
+                setPaginationModel(newModel);
+              }}
+              // selection wiring (as before)
+              rowSelectionModel={selectionModel}
+              onRowSelectionModelChange={(newSelectionModel) => {
+                console.log("New selection model:", newSelectionModel);
+                setSelectionModel(newSelectionModel);
+              }}
+              density="compact"
+              sx={{
+                height: "100%",
+                backgroundColor: "#F1F1F2",
+                color: "#000",
+                borderRadius: 2,
+
+                /* HEADER */
+                "& .MuiDataGrid-columnHeaders": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                  borderBottom: "1px solid #BDBDBD",
+                },
+                "& .MuiDataGrid-columnHeader": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                },
+                "& .MuiDataGrid-columnHeaderTitle": {
+                  color: "#000 !important",
+                  fontWeight: 600,
+                },
+
+                /* FOOTER */
+                "& .MuiDataGrid-footerContainer": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                  borderTop: "1px solid #BDBDBD",
+                },
+
+                /* ROW STRIPING */
+                "& .MuiDataGrid-row:nth-of-type(odd)": {
+                  backgroundColor: "#FFFFFF",
+                },
+                "& .MuiDataGrid-row:nth-of-type(even)": {
+                  backgroundColor: "#F9F9F9",
+                },
+
+                "& .MuiDataGrid-cell": {
+                  borderColor: "#DDD",
+                  color: "#000",
+                },
+
+                /* HOVER + SELECTION */
+                "& .MuiDataGrid-row:hover": {
+                  backgroundColor: "#EEF3FF !important",
+                },
+                "& .MuiDataGrid-row.Mui-selected": {
+                  backgroundColor: "#D6E4FF !important",
+                },
+                "& .MuiDataGrid-row.Mui-selected:hover": {
+                  backgroundColor: "#C7D8FF !important",
+                },
+              }}
+            />
+          </Box>
+          <Box
+            sx={{
+              flexBasis: 320,       // ⬅ fixed-ish width for side panel
+              flexShrink: 0,
+              height: "100%",
+              backgroundColor: "#fafafa",
+              borderRadius: 2,
+              p: 2,
+              overflow: "auto",
+            }}
+          >
+            <Typography variant="body2">selected image thumbnails</Typography>
+          </Box>
+        </Box>
       </Box>
     </Box >
   );
