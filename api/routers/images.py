@@ -8,7 +8,7 @@ from typing import cast, List, Optional
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Form
 from sqlalchemy.orm import Session
 from api.db.session import get_db
 from api.db.models import Image, ImageClass, ImageLookup
@@ -18,7 +18,7 @@ from api.utils.image_management import delete_image_instance
 from pathlib import Path
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url 
 from api.utils.image_classification import cluster_images_by_distance
-from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse
+from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse, ImageSignedUrlOut, ImageIdsIn
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ async def create_image(
         ...,
         description="The drone image file to upload (e.g. JPEG with EXIF GPS data).",
     ),
+    category: str = Form(...),
     db: Session = Depends(get_db),
 ):
     """
@@ -74,7 +75,7 @@ async def create_image(
     logger.info(f"Saved uploaded image to {file_path}")
 
     # Extract EXIF geo info
-    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov = extract_exif_geo(file_path)
+    exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov, target_range, target_lon, target_lat = extract_exif_geo(file_path)
     logger.info(
         f"EXIF for {file.filename}: "
         f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
@@ -97,7 +98,11 @@ async def create_image(
         image_type=image_type,
         pitch=pitch,
         hfov=hfov,
-        vfov=vfov
+        vfov=vfov,
+        target_range=target_range,
+        target_lon=target_lon,
+        target_lat=target_lat,
+        category=category
     )
 
     db.add(image)
@@ -128,6 +133,7 @@ async def create_images(
         ...,
         description="A .zip file containing drone image files to upload",
     ),
+    category: str = Form(...),
     db: Session = Depends(get_db),
 ):
     if not file.filename or not file.filename.lower().endswith(".zip"):
@@ -181,6 +187,9 @@ async def create_images(
                     pitch,
                     hfov,
                     vfov,
+                    target_range, 
+                    target_lon, 
+                    target_lat
                 ) = extract_exif_geo(str(extracted_path_obj))
 
                 logger.info(
@@ -206,6 +215,10 @@ async def create_images(
                     pitch=pitch,
                     hfov=hfov,
                     vfov=vfov,
+                    target_range=target_range,
+                    target_lon=target_lon,
+                    target_lat=target_lat,
+                    category=category
                 )
 
                 db.add(image)
@@ -251,6 +264,38 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
 
     return image_out
 
+@router.post("/images/ids", response_model=list[ImageSignedUrlOut])
+def get_images_by_ids(
+    payload: ImageIdsIn,
+    db: Session = Depends(get_db),
+):
+    # Fetch all images whose IDs are in the provided list
+    images = (
+        db.query(Image)
+        .filter(Image.image_id.in_(payload.image_ids))
+        .all()
+    )
+
+    if not images:
+        # Optional – you can also just return []
+        raise HTTPException(status_code=404, detail="No images found for given IDs")
+
+    results: list[ImageSignedUrlOut] = []
+
+    for image in images:
+        signed_url = generate_signed_url(
+            str(image.object_name),
+            expires_in_seconds=3600,
+        )
+        results.append(
+            ImageSignedUrlOut(
+                image_id=str(image.image_id),
+                signed_url=signed_url,
+                name=str(image.name)
+            )
+        )
+
+    return results
 
 @router.get("/images", response_model=ImageListResponse)
 def list_images(
@@ -470,14 +515,26 @@ def cluster_images_endpoint(
         pitchs = [img.pitch for img in cluster if img.pitch is not None]
         hfovs = [img.hfov for img in cluster if img.hfov is not None]
         vfovs = [img.vfov for img in cluster if img.vfov is not None]
+        target_ranges = [img.target_range for img in cluster if img.target_range is not None]
+        target_lats = [img.target_lat for img in cluster if img.target_lat is not None]
+        target_lons = [img.target_lon for img in cluster if img.target_lon is not None]
+
         image_types = list(set([img.image_type for img in cluster if img.image_type is not None]))
+        categories = list(set([img.category for img in cluster if img.category is not None]))
 
         avg_alt = sum(alts) / len(alts) if alts else None
         avg_yaw = sum(yaws) / len(yaws) if yaws else None
         avg_pitch = sum(pitchs) / len(pitchs) if pitchs else None
         avg_hfov = sum(hfovs) / len(hfovs) if hfovs else None
         avg_vfov = sum(vfovs) / len(vfovs) if vfovs else None
+        
+        avg_target_range = sum(target_ranges) / len(target_ranges) if target_ranges else None
+        avg_target_lat = sum(target_lats) / len(target_lats) if target_lats else None
+        avg_target_lon = sum(target_lons) / len(target_lons) if target_lons else None
+
+
         image_type = image_types[0] if len(image_types) == 1 else "multiple"
+        category = categories[0] if len(categories) == 1 else "multiple"
 
         class_id = str(uuid.uuid4())
         geom: WKBElement = from_shape(Point(centroid_lon, centroid_lat), srid=4326) 
@@ -494,7 +551,11 @@ def cluster_images_endpoint(
             image_type=image_type,
             pitch=avg_pitch,
             hfov=avg_hfov,
-            vfov=avg_vfov
+            vfov=avg_vfov,
+            target_range=avg_target_range,
+            target_lat=avg_target_lat,
+            target_lon=avg_target_lon,
+            category=category
         )
         db.add(image_class)
 
@@ -566,7 +627,11 @@ def get_cluster_by_id(cluster_id: str, db: Session = Depends(get_db)):
                 image_type=image.image_type,
                 pitch=image.pitch,
                 hfov=image.hfov,
-                vfov=image.vfov
+                vfov=image.vfov,
+                target_range=image.target_range,
+                target_lat=image.target_lat,
+                target_lon=image.target_lon,
+                category=image.category
             )
         )
 

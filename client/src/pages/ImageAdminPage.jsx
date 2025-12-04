@@ -22,6 +22,7 @@ function ImageAdminPage() {
   const [maxYawDiff, setMaxYawDiff] = useState(5);
   const [resetExisting, setResetExisting] = useState(true);
   const [responseData, setResponseData] = useState(null);
+  const [imageCategory, setImageCategory] = useState("Uncategorised");
 
   // Grid state
   const [images, setImages] = useState([]);
@@ -33,6 +34,8 @@ function ImageAdminPage() {
   const [imageType, setImageType] = useState("");
   const [createdFrom, setCreatedFrom] = useState(null);
   const [createdTo, setCreatedTo] = useState(null);
+
+  const [selectedThumbnails, setSelectedThumbnails] = useState([]);
 
   // Use the new paginationModel API (works reliably in v6/v7)
   const [paginationModel, setPaginationModel] = useState({
@@ -65,6 +68,7 @@ function ImageAdminPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("category", imageCategory);
 
     try {
       const response = await axios.post(`${apiBase}/images`, formData, {
@@ -75,8 +79,6 @@ function ImageAdminPage() {
 
       if (response.status === 201) {
         setResponseData(response.data);
-        console.log("submitted file:", file.name);
-        console.log(response.data);
         // Refresh grid after upload (reload current page)
         reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
@@ -108,7 +110,6 @@ function ImageAdminPage() {
 
       if (response.status === 200) {
         setResponseData(response.data);
-        console.log("sent payload", payload);
         // Refresh grid if clustering changes image state
         reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
@@ -128,7 +129,7 @@ function ImageAdminPage() {
       field: "name",
       headerName: "Name",
       flex: 1,
-      minWidth: 220,
+      minWidth: 180,
     },
     {
       field: "image_type",
@@ -160,6 +161,26 @@ function ImageAdminPage() {
       headerName: "Yaw (°)",
       width: 110
     },
+    {
+      field: "target_range",
+      headerName: "Target Range",
+      width: 110
+    },
+    {
+      field: "target_lon",
+      headerName: "Target Lon",
+      width: 110
+    },
+    {
+      field: "target_lat",
+      headerName: "Target Lat",
+      width: 110
+    },
+    {
+      field: "category",
+      headerName: "Category",
+      width: 110
+    }
   ];
 
   // -------------------------
@@ -180,7 +201,6 @@ function ImageAdminPage() {
       });
 
       const data = response.data;
-      console.log("images response", data);
 
       const rows = (data.items || []).map((img) => ({
         id: img.image_id, // DataGrid row id
@@ -224,7 +244,6 @@ function ImageAdminPage() {
     if (!hasSelection) return;
 
     const idsToDelete = Array.from(idsSet);
-    console.log("Deleting image_ids:", idsToDelete);
 
     if (
       !window.confirm(
@@ -253,6 +272,8 @@ function ImageAdminPage() {
         type: "include",
         ids: new Set(),
       });
+
+      setSelectedThumbnails([]);
     } catch (err) {
       console.error("Failed to delete images", err);
       alert("Failed to delete images – check console for details.");
@@ -262,6 +283,25 @@ function ImageAdminPage() {
   };
 
   const selectedCount = selectionModel.ids ? selectionModel.ids.size : 0;
+
+  const fetchSelectedThumbnails = async (ids) => {
+    if (!ids || ids.length === 0) {
+      setSelectedThumbnails([]);
+      return;
+    }
+
+    try {
+      const payload = { image_ids: ids };
+
+      const response = await axios.post(`${apiBase}/images/ids`, payload);
+
+      // response.data is a list of { image_id, signed_url, name }
+      setSelectedThumbnails(response.data);
+    } catch (err) {
+      console.error("Failed to load selected thumbnails", err);
+      setSelectedThumbnails([]);
+    }
+  };
 
   return (
     <Box
@@ -308,13 +348,25 @@ function ImageAdminPage() {
             fontSize={16}
             sx={{
               variant: "label",
-              pt: "6px",
+              // pt: "6px",
               mr: 1,
-              mb: 1
+              mb: 2
             }}
           >
             Upload Images:
           </Typography>
+
+          <TextField
+            label="Image Category"
+            type="text"
+            value={imageCategory}
+            onChange={(e) => setImageCategory(e.target.value)}
+            height="12px"
+            sx={{
+              mb: 2
+            }}
+          />
+
           <Box
             sx={{
               flexDirection: "row",
@@ -540,7 +592,7 @@ function ImageAdminPage() {
 
             <DateTimePicker
               label="Captured To"
-              value={createdFrom ? dayjs(createdTo) : null}
+              value={createdTo ? dayjs(createdTo) : null}
               onChange={(newValue) => {
                 const formatted = newValue
                   ? newValue.format("YYYY-MM-DDTHH:mm:ss")
@@ -581,86 +633,174 @@ function ImageAdminPage() {
             Delete selected ({selectedCount})
           </Button>
         </Box>
-        <DataGrid
-          rows={images}
-          columns={columns}
-          checkboxSelection
-          disableRowSelectionOnClick
-          disableRowSelectionExcludeModel
-          paginationMode="server"
-          rowCount={rowCount}
-          loading={gridLoading}
-          // NEW pagination wiring
-          paginationModel={paginationModel}
-          onPaginationModelChange={(newModel) => {
-            // reset selection when changing page/size
-            setSelectionModel({
-              type: "include",
-              ids: new Set(),
-            });
-            setPaginationModel(newModel);
-          }}
-          // selection wiring (as before)
-          rowSelectionModel={selectionModel}
-          onRowSelectionModelChange={(newSelectionModel) => {
-            console.log("New selection model:", newSelectionModel);
-            setSelectionModel(newSelectionModel);
-          }}
-          density="compact"
+        <Box
           sx={{
-            flexGrow: 1,
-            height: "100%",
-            backgroundColor: "#F1F1F2",
-            color: "#000",
-            borderRadius: 2,
-
-            /* HEADER */
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-              borderBottom: "1px solid #BDBDBD",
-            },
-            "& .MuiDataGrid-columnHeader": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-            },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              color: "#000 !important",
-              fontWeight: 600,
-            },
-
-            /* FOOTER */
-            "& .MuiDataGrid-footerContainer": {
-              backgroundColor: "#E0E0E0 !important",
-              color: "#000 !important",
-              borderTop: "1px solid #BDBDBD",
-            },
-
-            /* ROW STRIPING */
-            "& .MuiDataGrid-row:nth-of-type(odd)": {
-              backgroundColor: "#FFFFFF",
-            },
-            "& .MuiDataGrid-row:nth-of-type(even)": {
-              backgroundColor: "#F9F9F9",
-            },
-
-            "& .MuiDataGrid-cell": {
-              borderColor: "#DDD",
-              color: "#000",
-            },
-
-            /* HOVER + SELECTION */
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: "#EEF3FF !important",
-            },
-            "& .MuiDataGrid-row.Mui-selected": {
-              backgroundColor: "#D6E4FF !important",
-            },
-            "& .MuiDataGrid-row.Mui-selected:hover": {
-              backgroundColor: "#C7D8FF !important",
-            },
+            display: "flex",
+            flex: 1,         // ⬅ fill remaining vertical space
+            minHeight: 0,    // ⬅ allow inner boxes to shrink and have internal scroll
+            overflow: "hidden",
           }}
-        />
+        >
+          <Box
+            sx={{
+              flex: 2,        // ⬅ give grid more space than right panel
+              minWidth: 0,    // ⬅ allow proper flex overflow handling
+              minHeight: 0,
+              mr: 1,
+            }}
+          >
+            <DataGrid
+              rows={images}
+              columns={columns}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableRowSelectionExcludeModel
+              paginationMode="server"
+              rowCount={rowCount}
+              loading={gridLoading}
+              // NEW pagination wiring
+              paginationModel={paginationModel}
+              onPaginationModelChange={(newModel) => {
+                // reset selection when changing page/size
+                setSelectionModel({
+                  type: "include",
+                  ids: new Set(),
+                });
+                setPaginationModel(newModel);
+              }}
+              // selection wiring (as before)
+              rowSelectionModel={selectionModel}
+              onRowSelectionModelChange={(newSelectionModel) => {
+                // Keep your Set-based selection model for delete logic
+                setSelectionModel(newSelectionModel);
+                // Fetch thumbnails for the currently selected IDs
+                fetchSelectedThumbnails(Array.from(newSelectionModel.ids));
+              }}
+              density="compact"
+              sx={{
+                height: "100%",
+                backgroundColor: "#F1F1F2",
+                color: "#000",
+                borderRadius: 2,
+
+                /* HEADER */
+                "& .MuiDataGrid-columnHeaders": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                  borderBottom: "1px solid #BDBDBD",
+                },
+                "& .MuiDataGrid-columnHeader": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                },
+                "& .MuiDataGrid-columnHeaderTitle": {
+                  color: "#000 !important",
+                  fontWeight: 600,
+                },
+
+                /* FOOTER */
+                "& .MuiDataGrid-footerContainer": {
+                  backgroundColor: "#E0E0E0 !important",
+                  color: "#000 !important",
+                  borderTop: "1px solid #BDBDBD",
+                },
+
+                /* ROW STRIPING */
+                "& .MuiDataGrid-row:nth-of-type(odd)": {
+                  backgroundColor: "#FFFFFF",
+                },
+                "& .MuiDataGrid-row:nth-of-type(even)": {
+                  backgroundColor: "#F9F9F9",
+                },
+
+                "& .MuiDataGrid-cell": {
+                  borderColor: "#DDD",
+                  color: "#000",
+                },
+
+                /* HOVER + SELECTION */
+                "& .MuiDataGrid-row:hover": {
+                  backgroundColor: "#EEF3FF !important",
+                },
+                "& .MuiDataGrid-row.Mui-selected": {
+                  backgroundColor: "#D6E4FF !important",
+                },
+                "& .MuiDataGrid-row.Mui-selected:hover": {
+                  backgroundColor: "#C7D8FF !important",
+                },
+              }}
+            />
+          </Box>
+          <Box
+            sx={{
+              flexBasis: 320,       // ⬅ fixed-ish width for side panel
+              flexShrink: 0,
+              height: "100%",
+              backgroundColor: "#fafafa",
+              borderRadius: 2,
+              p: 2,
+              overflow: "auto",
+              display: selectedThumbnails.length > 0 ? "block" : "none"
+            }}
+          >
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+              Selected image thumbnails
+            </Typography>
+
+            {selectedThumbnails.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "#999" }}>
+                No images selected.
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                {selectedThumbnails.map((img) => (
+                  <Box
+                    key={img.image_id}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        mb: 0.5,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={img.name}
+                    >
+                      {img.name}
+                    </Typography>
+
+                    <Box
+                      component="img"
+                      src={img.signed_url}
+                      alt={img.name}
+                      sx={{
+                        width: "100%",
+                        maxHeight: 120,
+                        objectFit: "cover",
+                        borderRadius: 1,
+                        border: "1px solid #ddd",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => window.open(img.signed_url, "_blank")}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Box>
       </Box>
     </Box >
   );
