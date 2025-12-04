@@ -12,6 +12,8 @@ import {
 } from "@mui/material";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import { DataGrid } from "@mui/x-data-grid";
+import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import dayjs from "dayjs";
 
 function ImageAdminPage() {
   const [loading, setLoading] = useState(false); // upload/cluster overlay
@@ -25,6 +27,12 @@ function ImageAdminPage() {
   const [images, setImages] = useState([]);
   const [rowCount, setRowCount] = useState(0);
   const [gridLoading, setGridLoading] = useState(false);
+
+  // Grid filters
+  const [searchName, setSearchName] = useState("");
+  const [imageType, setImageType] = useState("");
+  const [createdFrom, setCreatedFrom] = useState(null);
+  const [createdTo, setCreatedTo] = useState(null);
 
   // Use the new paginationModel API (works reliably in v6/v7)
   const [paginationModel, setPaginationModel] = useState({
@@ -164,6 +172,10 @@ function ImageAdminPage() {
         params: {
           page: pageArg + 1, // API is 1-based
           page_size: pageSizeArg,
+          ...(searchName ? { search: searchName } : {}), // only include the serach param if it is not null and exists
+          ...(imageType ? { image_type: imageType } : {}),
+          ...(createdFrom ? { created_from: createdFrom } : {}),
+          ...(createdTo ? { created_to: createdTo } : {}),
         },
       });
 
@@ -183,6 +195,19 @@ function ImageAdminPage() {
       setGridLoading(false);
     }
   };
+
+  const updateDataGrid = async () => {
+    reloadGrid(paginationModel.page, paginationModel.pageSize);
+  }
+
+  const resetDataGrid = async () => {
+    setSearchName(null);
+    setImageType(null);
+    setCreatedFrom(null);
+    setCreatedTo(null);
+
+    reloadGrid(paginationModel.page, paginationModel.pageSize)
+  }
 
   // reload whenever page or pageSize changes
   useEffect(() => {
@@ -244,7 +269,10 @@ function ImageAdminPage() {
         display: "flex",
         flexDirection: "column",
         padding: 1,
-        maxWidth: 1200,
+        minWidth: 1400,
+        maxWidth: 1800,
+        height: "100vh",            // full viewport height
+        boxSizing: "border-box",
       }}
     >
       <Box
@@ -383,6 +411,9 @@ function ImageAdminPage() {
                 />
               }
               label="Reset existing"
+              sx={{
+                display: "none"
+              }}
             />
 
             <Button
@@ -456,7 +487,8 @@ function ImageAdminPage() {
           mt: 2,
           display: "flex",
           flexDirection: "column",
-          height: 510,
+          flexGrow: 1,            // <- take all remaining vertical space
+          minHeight: 0,
         }}
       >
         <Box
@@ -467,9 +499,78 @@ function ImageAdminPage() {
             alignItems: "center",
           }}
         >
-          <Typography fontSize={16} fontWeight={500}>
-            All Images
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              gap: "5px",
+              alignItems: 'left',
+            }}
+          >
+            <TextField
+              label="Search Name"
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              height="12px"
+            />
+
+            <TextField
+              label="Image Type"
+              type="text"
+              value={imageType}
+              onChange={(e) => setImageType(e.target.value)}
+              height="12px"
+            />
+
+            <DateTimePicker
+              label="Captured From"
+              value={createdFrom ? dayjs(createdFrom) : null}
+              onChange={(newValue) => {
+                const formatted = newValue
+                  ? newValue.format("YYYY-MM-DDTHH:mm:ss")
+                  : null;
+                setCreatedFrom(formatted);
+              }}
+              slotProps={{
+                textField: {
+                  size: "small"
+                }
+              }}
+            />
+
+            <DateTimePicker
+              label="Captured To"
+              value={createdFrom ? dayjs(createdTo) : null}
+              onChange={(newValue) => {
+                const formatted = newValue
+                  ? newValue.format("YYYY-MM-DDTHH:mm:ss")
+                  : null;
+                setCreatedTo(formatted);
+              }}
+              slotProps={{
+                textField: {
+                  size: "small"
+                }
+              }}
+            />
+
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={resetDataGrid}
+            >
+              Reset
+            </Button>
+
+            <Button
+              variant="contained"
+              size="small"
+              onClick={updateDataGrid}
+            >
+              Apply Search
+            </Button>
+          </Box>
+
           <Button
             variant="outlined"
             color="error"
@@ -507,6 +608,8 @@ function ImageAdminPage() {
           }}
           density="compact"
           sx={{
+            flexGrow: 1,
+            height: "100%",
             backgroundColor: "#F1F1F2",
             color: "#000",
             borderRadius: 2,
@@ -559,7 +662,7 @@ function ImageAdminPage() {
           }}
         />
       </Box>
-    </Box>
+    </Box >
   );
 }
 

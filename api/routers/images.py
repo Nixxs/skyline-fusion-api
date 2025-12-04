@@ -333,8 +333,6 @@ def list_images(
         items=items,  # Pydantic uses from_attributes=True to map
     )
 
-
-
 @router.delete("/image/{image_id}", status_code=200)
 def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
     """

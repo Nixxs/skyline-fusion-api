@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 import App from "./App.jsx";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 const theme = createTheme({
   palette: {
@@ -79,7 +81,9 @@ createRoot(document.getElementById("root")).render(
     <BrowserRouter basename="drone-image-viewer">
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <App />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <App />
+        </LocalizationProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>
