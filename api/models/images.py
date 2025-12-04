@@ -24,6 +24,7 @@ class GetImageOut(BaseModel):
     target_range: float | None = None
     target_lon: float | None = None
     target_lat: float | None = None
+    category: str
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -45,6 +46,7 @@ class BaseImage(BaseModel):
     target_range: float | None = None
     target_lon: float | None = None
     target_lat: float | None = None
+    category: str
 
     # Needed so FastAPI can serialize from SQLAlchemy model instances
     model_config = ConfigDict(from_attributes=True)
@@ -138,6 +140,7 @@ class ImageListItem(BaseModel):
     target_range: float | None = None
     target_lon: float | None = None
     target_lat: float | None = None
+    category: str
 
     # So FastAPI can serialize directly from SQLAlchemy objects
     model_config = ConfigDict(from_attributes=True)

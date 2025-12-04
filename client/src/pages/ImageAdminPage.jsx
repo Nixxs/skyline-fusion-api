@@ -22,6 +22,7 @@ function ImageAdminPage() {
   const [maxYawDiff, setMaxYawDiff] = useState(5);
   const [resetExisting, setResetExisting] = useState(true);
   const [responseData, setResponseData] = useState(null);
+  const [imageCategory, setImageCategory] = useState("Uncategorised");
 
   // Grid state
   const [images, setImages] = useState([]);
@@ -67,6 +68,7 @@ function ImageAdminPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("category", imageCategory);
 
     try {
       const response = await axios.post(`${apiBase}/images`, formData, {
@@ -77,8 +79,6 @@ function ImageAdminPage() {
 
       if (response.status === 201) {
         setResponseData(response.data);
-        console.log("submitted file:", file.name);
-        console.log(response.data);
         // Refresh grid after upload (reload current page)
         reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
@@ -130,7 +130,7 @@ function ImageAdminPage() {
       field: "name",
       headerName: "Name",
       flex: 1,
-      minWidth: 220,
+      minWidth: 180,
     },
     {
       field: "image_type",
@@ -175,6 +175,11 @@ function ImageAdminPage() {
     {
       field: "target_lat",
       headerName: "Target Lat",
+      width: 110
+    },
+    {
+      field: "category",
+      headerName: "Category",
       width: 110
     }
   ];
@@ -270,6 +275,8 @@ function ImageAdminPage() {
         type: "include",
         ids: new Set(),
       });
+
+      setSelectedThumbnails([]);
     } catch (err) {
       console.error("Failed to delete images", err);
       alert("Failed to delete images – check console for details.");
@@ -360,6 +367,18 @@ function ImageAdminPage() {
           >
             Upload Images:
           </Typography>
+
+          <TextField
+            label="Image Category"
+            type="text"
+            value={imageCategory}
+            onChange={(e) => setImageCategory(e.target.value)}
+            height="12px"
+            sx={{
+              mb: 1
+            }}
+          />
+
           <Box
             sx={{
               flexDirection: "row",

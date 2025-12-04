@@ -25,7 +25,7 @@ def extract_exif_geo(file_path: str) -> Tuple[
         Optional[float],
         Optional[float],
         Optional[float],
-        Optional[float],
+        Optional[float]
     ]:
     """
     Read EXIF from an image file and return (name, lon, lat, alt_m, yaw_deg, created).
