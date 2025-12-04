@@ -151,3 +151,11 @@ class ImageListResponse(BaseModel):
     page: int
     page_size: int
     items: List[ImageListItem]
+
+class ImageIdsIn(BaseModel):
+    image_ids: List[str]
+
+class ImageSignedUrlOut(BaseModel):
+    image_id: str
+    signed_url: str
+    name: str

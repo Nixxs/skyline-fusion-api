@@ -18,7 +18,7 @@ from api.utils.image_management import delete_image_instance
 from pathlib import Path
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url 
 from api.utils.image_classification import cluster_images_by_distance
-from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse
+from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse, ImageSignedUrlOut, ImageIdsIn
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
@@ -264,6 +264,38 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
 
     return image_out
 
+@router.post("/images/ids", response_model=list[ImageSignedUrlOut])
+def get_images_by_ids(
+    payload: ImageIdsIn,
+    db: Session = Depends(get_db),
+):
+    # Fetch all images whose IDs are in the provided list
+    images = (
+        db.query(Image)
+        .filter(Image.image_id.in_(payload.image_ids))
+        .all()
+    )
+
+    if not images:
+        # Optional – you can also just return []
+        raise HTTPException(status_code=404, detail="No images found for given IDs")
+
+    results: list[ImageSignedUrlOut] = []
+
+    for image in images:
+        signed_url = generate_signed_url(
+            str(image.object_name),
+            expires_in_seconds=3600,
+        )
+        results.append(
+            ImageSignedUrlOut(
+                image_id=str(image.image_id),
+                signed_url=signed_url,
+                name=str(image.name)
+            )
+        )
+
+    return results
 
 @router.get("/images", response_model=ImageListResponse)
 def list_images(

@@ -110,7 +110,6 @@ function ImageAdminPage() {
 
       if (response.status === 200) {
         setResponseData(response.data);
-        console.log("sent payload", payload);
         // Refresh grid if clustering changes image state
         reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
@@ -202,7 +201,6 @@ function ImageAdminPage() {
       });
 
       const data = response.data;
-      console.log("images response", data);
 
       const rows = (data.items || []).map((img) => ({
         id: img.image_id, // DataGrid row id
@@ -246,7 +244,6 @@ function ImageAdminPage() {
     if (!hasSelection) return;
 
     const idsToDelete = Array.from(idsSet);
-    console.log("Deleting image_ids:", idsToDelete);
 
     if (
       !window.confirm(
@@ -294,23 +291,14 @@ function ImageAdminPage() {
     }
 
     try {
-      // Fetch each image in parallel
-      const results = await Promise.all(
-        ids.map((imageId) =>
-          axios
-            .get(`${apiBase}/image/${imageId}`)
-            .then((res) => ({
-              image_id: imageId,
-              signed_url: res.data.signed_url,
-              name: res.data.name,
-            }))
-        )
-      );
+      const payload = { image_ids: ids };
 
-      setSelectedThumbnails(results);
+      const response = await axios.post(`${apiBase}/images/ids`, payload);
+
+      // response.data is a list of { image_id, signed_url, name }
+      setSelectedThumbnails(response.data);
     } catch (err) {
       console.error("Failed to load selected thumbnails", err);
-      // You might choose to clear or partially keep previous state here
       setSelectedThumbnails([]);
     }
   };
