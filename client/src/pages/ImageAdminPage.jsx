@@ -348,9 +348,9 @@ function ImageAdminPage() {
             fontSize={16}
             sx={{
               variant: "label",
-              pt: "6px",
+              // pt: "6px",
               mr: 1,
-              mb: 1
+              mb: 2
             }}
           >
             Upload Images:
@@ -363,7 +363,7 @@ function ImageAdminPage() {
             onChange={(e) => setImageCategory(e.target.value)}
             height="12px"
             sx={{
-              mb: 1
+              mb: 2
             }}
           />
 
