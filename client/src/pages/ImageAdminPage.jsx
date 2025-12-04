@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Box,
@@ -7,59 +7,87 @@ import {
   TextField,
   FormControlLabel,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
-import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
-import Tooltip from '@mui/material/Tooltip';
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import { DataGrid } from "@mui/x-data-grid";
+import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import dayjs from "dayjs";
 
 function ImageAdminPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // upload/cluster overlay
   const [file, setFile] = useState(null);
-  const [maxDistance, setMaxDistance] = useState(200);
-  const [maxYawDiff, setMaxYawDiff] = useState(90);
+  const [maxDistance, setMaxDistance] = useState(2);
+  const [maxYawDiff, setMaxYawDiff] = useState(5);
   const [resetExisting, setResetExisting] = useState(true);
   const [responseData, setResponseData] = useState(null);
 
+  // Grid state
+  const [images, setImages] = useState([]);
+  const [rowCount, setRowCount] = useState(0);
+  const [gridLoading, setGridLoading] = useState(false);
+
+  // Grid filters
+  const [searchName, setSearchName] = useState("");
+  const [imageType, setImageType] = useState("");
+  const [createdFrom, setCreatedFrom] = useState(null);
+  const [createdTo, setCreatedTo] = useState(null);
+
+  // Use the new paginationModel API (works reliably in v6/v7)
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0, // 0-based for the grid
+    pageSize: 50,
+  });
+
+  // Selection model (Set-based, as per our last working version)
+  const [selectionModel, setSelectionModel] = useState({
+    type: "include",
+    ids: new Set(),
+  });
+
+  const apiBase = import.meta.env.VITE_API_URL;
+
+  // -------------------------
+  // Upload + clustering
+  // -------------------------
   const handleFileChange = (event) => {
-    const selectedFile = event.target.files?.[0];
-    setFile(selectedFile || null);
-
-
+    const selectedFile = event.target.files?.[0] || null;
+    setFile(selectedFile);
     console.log("file set");
-  }
+  };
 
   const handleUpload = async (event) => {
     event.preventDefault();
+    if (!file) return;
+
     setLoading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await axios.post(`${apiBase}/images`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       if (response.status === 201) {
         setResponseData(response.data);
-
-        console.log("submitted file:", file.name)
+        console.log("submitted file:", file.name);
         console.log(response.data);
+        // Refresh grid after upload (reload current page)
+        reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
     } catch (error) {
       console.error(error);
       setResponseData(error);
     } finally {
       setLoading(false);
-      setFile(null)
+      setFile(null);
     }
-  }
+  };
 
   const handleClustering = async (event) => {
     event.preventDefault();
@@ -69,20 +97,20 @@ function ImageAdminPage() {
       max_distance_m: Number(maxDistance),
       max_yaw_diff_deg: Number(maxYawDiff),
       reset_existing: resetExisting,
-    }
+    };
+
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images/cluster`,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${apiBase}/images/cluster`, payload, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       if (response.status === 200) {
         setResponseData(response.data);
+        console.log("sent payload", payload);
+        // Refresh grid if clustering changes image state
+        reloadGrid(paginationModel.page, paginationModel.pageSize);
       }
     } catch (error) {
       console.log(error);
@@ -90,28 +118,150 @@ function ImageAdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // -------------------------
+  // Grid: columns
+  // -------------------------
+  const columns = [
+    {
+      field: "name",
+      headerName: "Name",
+      flex: 1,
+      minWidth: 220,
+    },
+    {
+      field: "image_type",
+      headerName: "Type",
+      width: 110,
+    },
+    {
+      field: "created",
+      headerName: "Captured",
+      width: 190
+    },
+    {
+      field: "imported_utc",
+      headerName: "Imported (UTC)",
+      width: 220
+    },
+    {
+      field: "lon",
+      headerName: "Lon",
+      width: 120
+    },
+    {
+      field: "lat",
+      headerName: "Lat",
+      width: 120
+    },
+    {
+      field: "yaw_deg",
+      headerName: "Yaw (°)",
+      width: 110
+    },
+  ];
+
+  // -------------------------
+  // Grid: data loading
+  // -------------------------
+  const reloadGrid = async (pageArg, pageSizeArg) => {
+    setGridLoading(true);
+    try {
+      const response = await axios.get(`${apiBase}/images`, {
+        params: {
+          page: pageArg + 1, // API is 1-based
+          page_size: pageSizeArg,
+          ...(searchName ? { search: searchName } : {}), // only include the serach param if it is not null and exists
+          ...(imageType ? { image_type: imageType } : {}),
+          ...(createdFrom ? { created_from: createdFrom } : {}),
+          ...(createdTo ? { created_to: createdTo } : {}),
+        },
+      });
+
+      const data = response.data;
+      console.log("images response", data);
+
+      const rows = (data.items || []).map((img) => ({
+        id: img.image_id, // DataGrid row id
+        ...img,
+      }));
+
+      setImages(rows);
+      setRowCount(data.total ?? 0);
+    } catch (err) {
+      console.error("Failed to load images", err);
+    } finally {
+      setGridLoading(false);
+    }
+  };
+
+  const updateDataGrid = async () => {
+    reloadGrid(paginationModel.page, paginationModel.pageSize);
+  }
+
+  const resetDataGrid = async () => {
+    setSearchName(null);
+    setImageType(null);
+    setCreatedFrom(null);
+    setCreatedTo(null);
+
+    reloadGrid(paginationModel.page, paginationModel.pageSize)
+  }
+
+  // reload whenever page or pageSize changes
+  useEffect(() => {
+    reloadGrid(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
+
+  // -------------------------
+  // Grid: delete selected
+  // -------------------------
+  const handleDeleteSelected = async () => {
+    const idsSet = selectionModel.ids;
+    const hasSelection = idsSet && idsSet.size > 0;
+    if (!hasSelection) return;
+
+    const idsToDelete = Array.from(idsSet);
+    console.log("Deleting image_ids:", idsToDelete);
+
+    if (
+      !window.confirm(
+        `Delete ${idsToDelete.length} selected image(s)? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/images/cluster`,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      setGridLoading(true);
+      const res = await axios.delete(`${apiBase}/images/batch`, {
+        data: {
+          image_ids: idsToDelete,
+        },
+      });
 
-      if (response.status === 200) {
-        setResponseData(response.data);
-      }
-    } catch (error) {
-      console.log(error);
+      console.log("Delete response:", res.data);
+
+      // Optimistic local update
+      setImages((prev) => prev.filter((row) => !idsSet.has(row.id)));
+      setRowCount((prev) => Math.max(prev - idsToDelete.length, 0));
+
+      // Clear selection
+      setSelectionModel({
+        type: "include",
+        ids: new Set(),
+      });
+    } catch (err) {
+      console.error("Failed to delete images", err);
+      alert("Failed to delete images – check console for details.");
     } finally {
-      setLoading(false);
-      console.log("sent payload", payload);
+      setGridLoading(false);
     }
-  }
+  };
+
+  const selectedCount = selectionModel.ids ? selectionModel.ids.size : 0;
 
   return (
     <Box
@@ -119,7 +269,10 @@ function ImageAdminPage() {
         display: "flex",
         flexDirection: "column",
         padding: 1,
-        maxWidth: 900
+        minWidth: 1400,
+        maxWidth: 1800,
+        height: "100vh",            // full viewport height
+        boxSizing: "border-box",
       }}
     >
       <Box
@@ -258,6 +411,9 @@ function ImageAdminPage() {
                 />
               }
               label="Reset existing"
+              sx={{
+                display: "none"
+              }}
             />
 
             <Button
@@ -324,8 +480,190 @@ function ImageAdminPage() {
           }
         </Box>
       </Box>
+
+      {/* Bottom: DataGrid */}
+      <Box
+        sx={{
+          mt: 2,
+          display: "flex",
+          flexDirection: "column",
+          flexGrow: 1,            // <- take all remaining vertical space
+          minHeight: 0,
+        }}
+      >
+        <Box
+          sx={{
+            mb: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              gap: "5px",
+              alignItems: 'left',
+            }}
+          >
+            <TextField
+              label="Search Name"
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              height="12px"
+            />
+
+            <TextField
+              label="Image Type"
+              type="text"
+              value={imageType}
+              onChange={(e) => setImageType(e.target.value)}
+              height="12px"
+            />
+
+            <DateTimePicker
+              label="Captured From"
+              value={createdFrom ? dayjs(createdFrom) : null}
+              onChange={(newValue) => {
+                const formatted = newValue
+                  ? newValue.format("YYYY-MM-DDTHH:mm:ss")
+                  : null;
+                setCreatedFrom(formatted);
+              }}
+              slotProps={{
+                textField: {
+                  size: "small"
+                }
+              }}
+            />
+
+            <DateTimePicker
+              label="Captured To"
+              value={createdFrom ? dayjs(createdTo) : null}
+              onChange={(newValue) => {
+                const formatted = newValue
+                  ? newValue.format("YYYY-MM-DDTHH:mm:ss")
+                  : null;
+                setCreatedTo(formatted);
+              }}
+              slotProps={{
+                textField: {
+                  size: "small"
+                }
+              }}
+            />
+
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={resetDataGrid}
+            >
+              Reset
+            </Button>
+
+            <Button
+              variant="contained"
+              size="small"
+              onClick={updateDataGrid}
+            >
+              Apply Search
+            </Button>
+          </Box>
+
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            disabled={selectedCount === 0 || gridLoading}
+            onClick={handleDeleteSelected}
+          >
+            Delete selected ({selectedCount})
+          </Button>
+        </Box>
+        <DataGrid
+          rows={images}
+          columns={columns}
+          checkboxSelection
+          disableRowSelectionOnClick
+          disableRowSelectionExcludeModel
+          paginationMode="server"
+          rowCount={rowCount}
+          loading={gridLoading}
+          // NEW pagination wiring
+          paginationModel={paginationModel}
+          onPaginationModelChange={(newModel) => {
+            // reset selection when changing page/size
+            setSelectionModel({
+              type: "include",
+              ids: new Set(),
+            });
+            setPaginationModel(newModel);
+          }}
+          // selection wiring (as before)
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(newSelectionModel) => {
+            console.log("New selection model:", newSelectionModel);
+            setSelectionModel(newSelectionModel);
+          }}
+          density="compact"
+          sx={{
+            flexGrow: 1,
+            height: "100%",
+            backgroundColor: "#F1F1F2",
+            color: "#000",
+            borderRadius: 2,
+
+            /* HEADER */
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+              borderBottom: "1px solid #BDBDBD",
+            },
+            "& .MuiDataGrid-columnHeader": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+            },
+            "& .MuiDataGrid-columnHeaderTitle": {
+              color: "#000 !important",
+              fontWeight: 600,
+            },
+
+            /* FOOTER */
+            "& .MuiDataGrid-footerContainer": {
+              backgroundColor: "#E0E0E0 !important",
+              color: "#000 !important",
+              borderTop: "1px solid #BDBDBD",
+            },
+
+            /* ROW STRIPING */
+            "& .MuiDataGrid-row:nth-of-type(odd)": {
+              backgroundColor: "#FFFFFF",
+            },
+            "& .MuiDataGrid-row:nth-of-type(even)": {
+              backgroundColor: "#F9F9F9",
+            },
+
+            "& .MuiDataGrid-cell": {
+              borderColor: "#DDD",
+              color: "#000",
+            },
+
+            /* HOVER + SELECTION */
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: "#EEF3FF !important",
+            },
+            "& .MuiDataGrid-row.Mui-selected": {
+              backgroundColor: "#D6E4FF !important",
+            },
+            "& .MuiDataGrid-row.Mui-selected:hover": {
+              backgroundColor: "#C7D8FF !important",
+            },
+          }}
+        />
+      </Box>
     </Box >
-  )
+  );
 }
 
 export default ImageAdminPage;

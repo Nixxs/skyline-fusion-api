@@ -1,7 +1,28 @@
 import { Box } from "@mui/material";
 import { ReactPhotoSphereViewer } from "react-photo-sphere-viewer";
+import { useRef } from "react";
 
-export default function PanoViewer({ src }) {
+export default function PanoViewer({ src, onViewChange }) {
+  const viewerRef = useRef(null);
+
+  const handleReady = (viewer) => {
+    // viewer is the Photo Sphere Viewer instance
+    viewerRef.current = viewer;
+
+    const emitViewState = () => {
+      const { yaw, pitch } = viewer.getPosition();
+      const fov = viewer.getFov ? viewer.getFov() : undefined;
+      onViewChange?.({ yaw, pitch, fov });
+    };
+
+    // fire once on ready
+    emitViewState();
+
+    // subscribe to position + zoom changes
+    viewer.addEventListener("position-updated", emitViewState);
+    viewer.addEventListener("zoom-updated", emitViewState);
+  };
+
   return (
     <Box
       sx={{
@@ -17,16 +38,16 @@ export default function PanoViewer({ src }) {
         height="100%"
         width="100%"
         navbar={true}
-        minFov={1}     // allow very deep zoom (default ~30-50)
-        maxFov={120}    // wide angle zoom out more if desired
-        defaultZoomLvl={50} // 0 = allow full zoom range
+        minFov={1}      // allow very deep zoom
+        maxFov={120}    // wide angle zoom out
+        defaultZoomLvl={50}
+        onReady={handleReady}
         rendererParameters={{
           alpha: true,
           antialias: true,
-          preserveDrawingBuffer: true,   // <- key bit for screenshots
+          preserveDrawingBuffer: true,
         }}
       />
     </Box>
   );
 }
-

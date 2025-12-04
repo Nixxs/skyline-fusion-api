@@ -114,3 +114,29 @@ class CreateImagesOut(BaseModel):
         }
     )
 
+class DeleteImagesRequest(BaseModel):
+    image_ids: List[str]
+
+class ImageListItem(BaseModel):
+    image_id: str
+    name: str
+    lon: float | None = None
+    lat: float | None = None
+    alt_m: float | None = None
+    yaw_deg: float | None = None
+    created: dt.datetime | None = None
+    imported_utc: str
+    image_type: str | None = None
+    hfov: float | None = None
+    vfov: float | None = None
+    pitch: float | None = None
+
+    # So FastAPI can serialize directly from SQLAlchemy objects
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ImageListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[ImageListItem]

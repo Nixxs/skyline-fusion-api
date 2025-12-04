@@ -3,20 +3,22 @@ import logging
 import uuid
 import zipfile
 import os
-from typing import cast, List
+import shutil
+from typing import cast, List, Optional
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from sqlalchemy.orm import Session
 from api.db.session import get_db
 from api.db.models import Image, ImageClass, ImageLookup
 from api.utils.file_handler import save_file
 from api.utils.exif import extract_exif_geo
+from api.utils.image_management import delete_image_instance
 from pathlib import Path
-from api.utils.gcp import handle_gcs_image_upload, generate_signed_url
+from api.utils.gcp import handle_gcs_image_upload, generate_signed_url 
 from api.utils.image_classification import cluster_images_by_distance
-from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage
+from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
 
 logger = logging.getLogger(__name__)
@@ -128,21 +130,6 @@ async def create_images(
     ),
     db: Session = Depends(get_db),
 ):
-    """
-    Upload a zip file containing multiple drone images.
-
-    **Request format (multipart/form-data)**
-
-    - `file`: binary zip file containing the images (e.g. JPEG from the drone)
-
-    **Behaviour**
-
-    1. The uploaded ZIP is written under the configured data path (e.g. `data/images/`).
-    2. The ZIP is extracted into a batch folder.
-    3. EXIF GPS metadata is read from each extracted image.
-    4. A row is inserted into `images` for each valid image.
-    5. All created records and file paths are returned.
-    """
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Uploaded file must be a .zip archive")
 
@@ -160,30 +147,44 @@ async def create_images(
     created_images: list[Image] = []
     file_paths: list[str] = []
 
+    IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
+
     try:
+        # 1) Extract everything first
         with zipfile.ZipFile(zip_path_obj, "r") as zf:
-            for member in zf.namelist():
-                # Skip directories
-                if member.endswith("/"):
+            zf.extractall(extract_dir)
+            logger.info(f"Extracted ZIP to {extract_dir}")
+
+        # 2) Walk the extracted tree recursively
+        for root, dirs, files in os.walk(extract_dir):
+            for filename in files:
+                if not filename.lower().endswith(IMAGE_EXTENSIONS):
+                    rel = Path(root, filename).relative_to(extract_dir)
+                    logger.info(f"Skipping non-image file in zip tree: {rel}")
                     continue
 
-                # Only process likely image files
-                if not member.lower().endswith((".jpg", ".jpeg", ".png", ".tif", ".tiff")):
-                    logger.info(f"Skipping non-image file in zip: {member}")
-                    continue
-
-                # Extract file
-                extracted_path = zf.extract(member, path=extract_dir)
-                extracted_path_obj = Path(extracted_path)
+                extracted_path_obj = Path(root) / filename
+                rel_path = extracted_path_obj.relative_to(extract_dir)
                 file_paths.append(str(extracted_path_obj))
-                logger.info(f"Extracted image {member} to {extracted_path_obj}")
+                logger.info(f"Found image {rel_path} at {extracted_path_obj}")
 
                 # Extract EXIF geo info
-                exif_name, exif_lon, exif_lat, exif_alt, exif_yaw, created, geom, image_type, pitch, hfov, vfov = extract_exif_geo(
-                    str(extracted_path_obj)
-                )
+                (
+                    exif_name,
+                    exif_lon,
+                    exif_lat,
+                    exif_alt,
+                    exif_yaw,
+                    created,
+                    geom,
+                    image_type,
+                    pitch,
+                    hfov,
+                    vfov,
+                ) = extract_exif_geo(str(extracted_path_obj))
+
                 logger.info(
-                    f"EXIF for {member}: "
+                    f"EXIF for {rel_path}: "
                     f"lon={exif_lon}, lat={exif_lat}, alt={exif_alt}, yaw={exif_yaw}"
                 )
 
@@ -204,7 +205,7 @@ async def create_images(
                     image_type=image_type,
                     pitch=pitch,
                     hfov=hfov,
-                    vfov=vfov
+                    vfov=vfov,
                 )
 
                 db.add(image)
@@ -217,7 +218,8 @@ async def create_images(
         for img in created_images:
             db.refresh(img)
 
-        os.rmdir(extract_dir)
+        # Clean up extracted tree + zip
+        shutil.rmtree(extract_dir, ignore_errors=True)
         os.remove(zip_path)
 
         return CreateImagesOut(
@@ -228,6 +230,10 @@ async def create_images(
 
     except zipfile.BadZipFile:
         logger.exception("Uploaded file is not a valid ZIP")
+        # best-effort cleanup
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        if zip_path_obj.exists():
+            os.remove(zip_path)
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid ZIP archive")
 
 @router.get("/image/{image_id}", status_code=200, response_model=GetImageOut)
@@ -244,6 +250,161 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     image_out = image_out.model_copy(update={"signed_url": signed_url})
 
     return image_out
+
+
+@router.get("/images", response_model=ImageListResponse)
+def list_images(
+    page: int = Query(1, ge=1, description="1-based page index"),
+    page_size: int = Query(
+        50,
+        ge=1,
+        le=200,
+        description="Page size (max 200 to protect the DB)",
+    ),
+    image_type: Optional[str] = Query(
+        None, description="Filter by image_type (e.g. 'pano', 'photo')"
+    ),
+    search: Optional[str] = Query(
+        None, description="Case-insensitive name contains filter"
+    ),
+    class_id: Optional[str] = Query(
+        None, description="Filter by related ImageClass class_id"
+    ),
+    created_from: Optional[dt.datetime] = Query(
+        None, description="Filter: created >= this UTC datetime"
+    ),
+    created_to: Optional[dt.datetime] = Query(
+        None, description="Filter: created <= this UTC datetime"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Paged, filterable list of images.
+
+    Intended for grids / selectors where users can:
+    - see image metadata
+    - filter / search
+    - select multiple rows for batch delete, etc.
+    """
+    query = db.query(Image)
+
+    # Optional join if filtering by class_id
+    if class_id:
+        query = (
+            query.join(ImageLookup, Image.image_id == ImageLookup.image_id)
+            .filter(ImageLookup.class_id == class_id)
+        )
+
+    if image_type:
+        query = query.filter(Image.image_type == image_type)
+
+    if search:
+        like = f"%{search}%"
+        query = query.filter(Image.name.ilike(like))
+
+    if created_from:
+        query = query.filter(Image.created >= created_from)
+    if created_to:
+        query = query.filter(Image.created <= created_to)
+
+    # Total before pagination
+    total = query.count()
+
+    # Apply ordering + pagination
+    # Primary sort by created desc (nulls last), then FID as tie-breaker
+    query = (
+        query.order_by(
+            Image.created.desc().nullslast(),
+            Image.FID.desc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+
+    images = query.all()
+
+    # Explicit mapping keeps the type checker happy
+    items = [ImageListItem.model_validate(img) for img in images]
+
+    return ImageListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=items,  # Pydantic uses from_attributes=True to map
+    )
+
+@router.delete("/image/{image_id}", status_code=200)
+def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
+    """
+    Delete an image by ID.
+    """
+    image: Image | None = (
+        db.query(Image)
+        .filter(Image.image_id == image_id)
+        .first()
+    )
+
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    gcs_deleted = delete_image_instance(image, db)
+
+    db.commit()
+
+    return {
+        "status": "ok",
+        "deleted_image_id": image_id,
+        "gcs_deleted": gcs_deleted,
+    }
+
+
+@router.delete("/images/batch", status_code=200)
+def delete_images_batch(payload: DeleteImagesRequest, db: Session = Depends(get_db)):
+    """
+    Delete multiple images by ID.
+
+    Behaviour:
+    - Look up all images in `images` table that match the provided IDs.
+    - For each found image:
+        - Delete `image_lookup` rows referencing it.
+        - Decrement `image_count` on related `image_classes`.
+        - Delete the image row.
+        - Attempt to delete from GCS (errors logged, do not block DB).
+    - Commit once at the end.
+    - Return summary of deleted and not-found IDs.
+    """
+    if not payload.image_ids:
+        raise HTTPException(status_code=400, detail="No image_ids provided")
+
+    # Load all images that exist for the given IDs
+    images: list[Image] = (
+        db.query(Image)
+        .filter(Image.image_id.in_(payload.image_ids))
+        .all()
+    )
+
+    found_ids = {img.image_id for img in images}
+    not_found_ids = [iid for iid in payload.image_ids if iid not in found_ids]
+
+    results = []
+    for img in images:
+        gcs_deleted = delete_image_instance(img, db)
+        results.append(
+            {
+                "image_id": img.image_id,
+                "gcs_deleted": gcs_deleted,
+            }
+        )
+
+    db.commit()
+
+    return {
+        "status": "ok",
+        "deleted": results,
+        "not_found": not_found_ids,
+    }
+
+
 
 @router.post(
     "/images/cluster",
