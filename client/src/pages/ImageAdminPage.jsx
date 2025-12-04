@@ -34,6 +34,8 @@ function ImageAdminPage() {
   const [createdFrom, setCreatedFrom] = useState(null);
   const [createdTo, setCreatedTo] = useState(null);
 
+  const [selectedThumbnails, setSelectedThumbnails] = useState([]);
+
   // Use the new paginationModel API (works reliably in v6/v7)
   const [paginationModel, setPaginationModel] = useState({
     page: 0, // 0-based for the grid
@@ -277,6 +279,34 @@ function ImageAdminPage() {
   };
 
   const selectedCount = selectionModel.ids ? selectionModel.ids.size : 0;
+
+  const fetchSelectedThumbnails = async (ids) => {
+    if (!ids || ids.length === 0) {
+      setSelectedThumbnails([]);
+      return;
+    }
+
+    try {
+      // Fetch each image in parallel
+      const results = await Promise.all(
+        ids.map((imageId) =>
+          axios
+            .get(`${apiBase}/image/${imageId}`)
+            .then((res) => ({
+              image_id: imageId,
+              signed_url: res.data.signed_url,
+              name: res.data.name,
+            }))
+        )
+      );
+
+      setSelectedThumbnails(results);
+    } catch (err) {
+      console.error("Failed to load selected thumbnails", err);
+      // You might choose to clear or partially keep previous state here
+      setSelectedThumbnails([]);
+    }
+  };
 
   return (
     <Box
@@ -555,7 +585,7 @@ function ImageAdminPage() {
 
             <DateTimePicker
               label="Captured To"
-              value={createdFrom ? dayjs(createdTo) : null}
+              value={createdTo ? dayjs(createdTo) : null}
               onChange={(newValue) => {
                 const formatted = newValue
                   ? newValue.format("YYYY-MM-DDTHH:mm:ss")
@@ -634,8 +664,10 @@ function ImageAdminPage() {
               // selection wiring (as before)
               rowSelectionModel={selectionModel}
               onRowSelectionModelChange={(newSelectionModel) => {
-                console.log("New selection model:", newSelectionModel);
+                // Keep your Set-based selection model for delete logic
                 setSelectionModel(newSelectionModel);
+                // Fetch thumbnails for the currently selected IDs
+                fetchSelectedThumbnails(Array.from(newSelectionModel.ids));
               }}
               density="compact"
               sx={{
@@ -701,9 +733,65 @@ function ImageAdminPage() {
               borderRadius: 2,
               p: 2,
               overflow: "auto",
+              display: selectedThumbnails.length > 0 ? "block" : "none"
             }}
           >
-            <Typography variant="body2">selected image thumbnails</Typography>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+              Selected image thumbnails
+            </Typography>
+
+            {selectedThumbnails.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "#999" }}>
+                No images selected.
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                {selectedThumbnails.map((img) => (
+                  <Box
+                    key={img.image_id}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        mb: 0.5,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={img.name}
+                    >
+                      {img.name}
+                    </Typography>
+
+                    <Box
+                      component="img"
+                      src={img.signed_url}
+                      alt={img.name}
+                      sx={{
+                        width: "100%",
+                        maxHeight: 120,
+                        objectFit: "cover",
+                        borderRadius: 1,
+                        border: "1px solid #ddd",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => window.open(img.signed_url, "_blank")}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
