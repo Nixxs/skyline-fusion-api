@@ -321,6 +321,9 @@ def list_images(
     created_to: Optional[dt.datetime] = Query(
         None, description="Filter: created <= this UTC datetime"
     ),
+    image_category: Optional[str] = Query(
+        None, description="Filter by category (e.g. 'beverley', 'some place')"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -342,6 +345,9 @@ def list_images(
 
     if image_type:
         query = query.filter(Image.image_type == image_type)
+
+    if image_category:
+        query = query.filter(Image.category == image_category)
 
     if search:
         like = f"%{search}%"
