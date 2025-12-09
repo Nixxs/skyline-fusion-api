@@ -20,6 +20,8 @@ class GlobalConfig(BaseConfig):
     ADMIN_USER_EMAIL: str
     ADMIN_USER_PASSWORD_HASH: str
 
+    JWT_SECRET: str
+
     model_config = SettingsConfigDict(env_prefix="")
 
     @property

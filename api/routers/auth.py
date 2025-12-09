@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException 
 from api.models.auth import UserIn, HashRequest
-from api.utils.security import mask_email
+from api.utils.security import mask_email, create_access_token
 from passlib.context import CryptContext
 from api.config import config
 
@@ -20,6 +20,8 @@ async def login(user: UserIn):
 
     if verified and (user.email.lower() == config.ADMIN_USER_EMAIL.lower()):
         logger.info(f"user: {masked_email} verified")
+
+        token = create_access_token(user.email, "admin")
     else:
         raise HTTPException(
             status_code=401,
@@ -28,7 +30,7 @@ async def login(user: UserIn):
         )
 
     return{
-        "access_token":"your token would go here if this was implemented",
+        "access_token":token,
         "token_type":"bearer"
     }
 
