@@ -17,7 +17,7 @@ import dayjs from "dayjs";
 import { useAuth } from "../auth/AuthContext"
 
 function ImageAdminPage() {
-  const { authRequest } = useAuth();
+  const { authRequest, token, logout, showLogin } = useAuth();
 
   const [loading, setLoading] = useState(false); // upload/cluster overlay
   const [file, setFile] = useState(null);
@@ -342,7 +342,10 @@ function ImageAdminPage() {
       <Box
         sx={{
           mb: 1,
-          mt: 0
+          mt: 0,
+          flexDirection: "row",
+          display: "flex",
+          justifyContent: "space-between"
         }}
       >
         <Typography
@@ -351,6 +354,24 @@ function ImageAdminPage() {
         >
           Drone Image Admin
         </Typography>
+
+        {token ?
+          <Button
+            color="inherit"
+            onClick={logout}
+            variant="outlined"
+          >
+            Sign out
+          </Button>
+          :
+          <Button
+            color="inherit"
+            onClick={showLogin}
+            variant="contained"
+          >
+            Sign in
+          </Button>
+        }
       </Box>
       <Box
         sx={{
