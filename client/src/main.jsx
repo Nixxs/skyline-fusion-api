@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 import App from "./App.jsx";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { AuthProvider } from "./auth/AuthContext";
 
 const theme = createTheme({
   palette: {
@@ -82,7 +83,9 @@ createRoot(document.getElementById("root")).render(
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </LocalizationProvider>
       </ThemeProvider>
     </BrowserRouter>

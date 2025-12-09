@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware  # Import CORS middleware
 
 from api.routers.helloworld import router as user_router
 from api.routers.images import router as image_router
+from api.routers.auth import router as auth_router
 
 from api.config import config
 from api.logging_conf import configure_logging
@@ -77,6 +78,7 @@ app.add_middleware(CorrelationIdMiddleware)
 # Include routers
 app.include_router(user_router)
 app.include_router(image_router)
+app.include_router(auth_router)
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler_logging(request, exc):

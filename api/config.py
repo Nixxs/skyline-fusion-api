@@ -17,6 +17,11 @@ class GlobalConfig(BaseConfig):
     GCS_IMAGES_BUCKET: str
     GCS_SERVICE_ACCOUNT_FILE: str
 
+    ADMIN_USER_EMAIL: str
+    ADMIN_USER_PASSWORD_HASH: str
+
+    JWT_SECRET: str
+
     model_config = SettingsConfigDict(env_prefix="")
 
     @property
