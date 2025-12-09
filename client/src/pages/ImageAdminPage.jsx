@@ -34,6 +34,7 @@ function ImageAdminPage() {
   const [imageType, setImageType] = useState("");
   const [createdFrom, setCreatedFrom] = useState(null);
   const [createdTo, setCreatedTo] = useState(null);
+  const [searchCategory, setSearchCategory] = useState("");
 
   const [selectedThumbnails, setSelectedThumbnails] = useState([]);
 
@@ -197,6 +198,7 @@ function ImageAdminPage() {
           ...(imageType ? { image_type: imageType } : {}),
           ...(createdFrom ? { created_from: createdFrom } : {}),
           ...(createdTo ? { created_to: createdTo } : {}),
+          ...(searchCategory ? { image_category: searchCategory } : {})
         },
       });
 
@@ -574,6 +576,14 @@ function ImageAdminPage() {
               height="12px"
             />
 
+            <TextField
+              label="Image Category"
+              type="text"
+              value={searchCategory}
+              onChange={(e) => setSearchCategory(e.target.value)}
+              height="12px"
+            />
+
             <DateTimePicker
               label="Captured From"
               value={createdFrom ? dayjs(createdFrom) : null}
@@ -646,7 +656,6 @@ function ImageAdminPage() {
               flex: 2,        // ⬅ give grid more space than right panel
               minWidth: 0,    // ⬅ allow proper flex overflow handling
               minHeight: 0,
-              mr: 1,
             }}
           >
             <DataGrid
