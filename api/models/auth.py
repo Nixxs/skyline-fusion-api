@@ -6,3 +6,7 @@ class UserIn(BaseModel):
 
 class HashRequest(BaseModel):
     password: str
+
+class UserOut(BaseModel):
+    email: str
+    role: str

@@ -34,6 +34,8 @@ async def login(user: UserIn):
         "token_type":"bearer"
     }
 
+
+
 @router.post("/hash", status_code=200, include_in_schema=False)
 async def hash(hashRequest: HashRequest):
     logger.info(hashRequest.password)

@@ -1,10 +1,15 @@
 import logging
 import datetime as dt
+from typing import Annotated
+from fastapi import HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, ExpiredSignatureError, JWTError
 from api.config import config
+from api.models.auth import UserOut
 
 logger = logging.getLogger("api")
 ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def mask_email(email: str) -> str:
     if not email or "@" not in email:
@@ -47,3 +52,26 @@ def create_access_token(email:str, role:str) -> str:
     encoded_jwt = jwt.encode(jwt_data, config.JWT_SECRET, algorithm=ALGORITHM)
     
     return encoded_jwt
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserOut:
+    try:
+        payload = jwt.decode(token, key=config.JWT_SECRET, algorithms=[ALGORITHM])
+        email = payload.get("email")
+        role = payload.get("role")
+        logger.info(f"successfully authenticated user {mask_email(str(email))}")
+    except ExpiredSignatureError as e:
+        raise HTTPException(
+            status_code=401,
+            detail="token has expired",
+            headers={"WWW-AUthenticate":"Bearer"}
+        ) from e
+    except JWTError as e:
+        raise HTTPException(
+            status_code=401,
+            detail="could not validate credentials",
+            headers={"WWW-AUthenticate":"Bearer"}
+        )
+
+    user = UserOut(email=config.ADMIN_USER_EMAIL, role=str(role))
+
+    return user
