@@ -14,8 +14,11 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import { DataGrid } from "@mui/x-data-grid";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import dayjs from "dayjs";
+import { useAuth } from "../auth/AuthContext"
 
 function ImageAdminPage() {
+  const { authRequest } = useAuth();
+
   const [loading, setLoading] = useState(false); // upload/cluster overlay
   const [file, setFile] = useState(null);
   const [maxDistance, setMaxDistance] = useState(2);
@@ -72,10 +75,13 @@ function ImageAdminPage() {
     formData.append("category", imageCategory);
 
     try {
-      const response = await axios.post(`${apiBase}/images`, formData, {
+      const response = await authRequest({
+        url: "/images",
+        method: "POST",
+        data: formData,
         headers: {
-          "Content-Type": "multipart/form-data",
-        },
+          "Content-Type": "multipart/form-data"
+        }
       });
 
       if (response.status === 201) {
@@ -103,10 +109,13 @@ function ImageAdminPage() {
     };
 
     try {
-      const response = await axios.post(`${apiBase}/images/cluster`, payload, {
+      const response = await authRequest({
+        url: "/images/cluster",
+        method: "POST",
+        data: payload,
         headers: {
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       });
 
       if (response.status === 200) {
@@ -190,15 +199,17 @@ function ImageAdminPage() {
   const reloadGrid = async (pageArg, pageSizeArg) => {
     setGridLoading(true);
     try {
-      const response = await axios.get(`${apiBase}/images`, {
+      const response = await authRequest({
+        url: "/images",
+        method: "GET",
         params: {
           page: pageArg + 1, // API is 1-based
           page_size: pageSizeArg,
-          ...(searchName ? { search: searchName } : {}), // only include the serach param if it is not null and exists
+          ...(searchName ? { search: searchName } : {}),
           ...(imageType ? { image_type: imageType } : {}),
           ...(createdFrom ? { created_from: createdFrom } : {}),
           ...(createdTo ? { created_to: createdTo } : {}),
-          ...(searchCategory ? { image_category: searchCategory } : {})
+          ...(searchCategory ? { image_category: searchCategory } : {}),
         },
       });
 
@@ -257,13 +268,17 @@ function ImageAdminPage() {
 
     try {
       setGridLoading(true);
-      const res = await axios.delete(`${apiBase}/images/batch`, {
-        data: {
-          image_ids: idsToDelete,
-        },
+
+      const response = await authRequest({
+        url: "/images/batch",
+        method: "DELETE",
+        data: { image_ids: idsToDelete },
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
 
-      console.log("Delete response:", res.data);
+      console.log("Delete response:", response.data);
 
       // Optimistic local update
       setImages((prev) => prev.filter((row) => !idsSet.has(row.id)));
@@ -295,7 +310,14 @@ function ImageAdminPage() {
     try {
       const payload = { image_ids: ids };
 
-      const response = await axios.post(`${apiBase}/images/ids`, payload);
+      const response = await authRequest({
+        url: "/images/ids",
+        method: "POST",
+        data: payload,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
 
       // response.data is a list of { image_id, signed_url, name }
       setSelectedThumbnails(response.data);

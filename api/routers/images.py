@@ -4,7 +4,7 @@ import uuid
 import zipfile
 import os
 import shutil
-from typing import cast, List, Optional
+from typing import cast, List, Optional, Annotated
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
@@ -15,11 +15,13 @@ from api.db.models import Image, ImageClass, ImageLookup
 from api.utils.file_handler import save_file
 from api.utils.exif import extract_exif_geo
 from api.utils.image_management import delete_image_instance
+from api.utils.security import get_current_user
 from pathlib import Path
 from api.utils.gcp import handle_gcs_image_upload, generate_signed_url 
 from api.utils.image_classification import cluster_images_by_distance
 from api.models.images import GetImageOut, CreateImageOut, CreateImagesOut, BaseImage, DeleteImagesRequest, ImageListItem, ImageListResponse, ImageSignedUrlOut, ImageIdsIn
 from api.models.clusters import ClusterRequest, ClusterSummary, ClusterOut
+from api.models.auth import UserOut
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ router = APIRouter()
     ),
 )
 async def create_image(
+    current_user: Annotated[UserOut, Depends(get_current_user)],
     file: UploadFile = File(
         ...,
         description="The drone image file to upload (e.g. JPEG with EXIF GPS data).",
@@ -129,6 +132,7 @@ async def create_image(
     ),
 )
 async def create_images(
+    current_user: Annotated[UserOut, Depends(get_current_user)],
     file: UploadFile = File(
         ...,
         description="A .zip file containing drone image files to upload",
@@ -266,6 +270,7 @@ def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
 
 @router.post("/images/ids", response_model=list[ImageSignedUrlOut])
 def get_images_by_ids(
+    current_user: Annotated[UserOut, Depends(get_current_user)],
     payload: ImageIdsIn,
     db: Session = Depends(get_db),
 ):
@@ -299,6 +304,7 @@ def get_images_by_ids(
 
 @router.get("/images", response_model=ImageListResponse)
 def list_images(
+    current_user: Annotated[UserOut, Depends(get_current_user)],
     page: int = Query(1, ge=1, description="1-based page index"),
     page_size: int = Query(
         50,
@@ -385,7 +391,11 @@ def list_images(
     )
 
 @router.delete("/image/{image_id}", status_code=200)
-def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
+def delete_image_by_id(
+        current_user: Annotated[UserOut, Depends(get_current_user)], 
+        image_id: str, 
+        db: Session = Depends(get_db)
+):
     """
     Delete an image by ID.
     """
@@ -410,7 +420,11 @@ def delete_image_by_id(image_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/images/batch", status_code=200)
-def delete_images_batch(payload: DeleteImagesRequest, db: Session = Depends(get_db)):
+def delete_images_batch(
+        current_user: Annotated[UserOut, Depends(get_current_user)], 
+        payload: DeleteImagesRequest, 
+        db: Session = Depends(get_db)
+):
     """
     Delete multiple images by ID.
 
@@ -470,6 +484,7 @@ def delete_images_batch(payload: DeleteImagesRequest, db: Session = Depends(get_
     ),
 )
 def cluster_images_endpoint(
+    current_user: Annotated[UserOut, Depends(get_current_user)],
     params: ClusterRequest,
     db: Session = Depends(get_db),
 ):
