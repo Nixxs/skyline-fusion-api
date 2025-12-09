@@ -11,9 +11,11 @@ asgi-correlation-id
 python-json-logger
 python-jose
 python-multipart
-passlib[bcrypt]
 sqlalchemy
 pyexiftool
 google-cloud-storage
 geoalchemy2
 shapely
+passlib==1.7.4
+bcrypt==4.0.1
+
