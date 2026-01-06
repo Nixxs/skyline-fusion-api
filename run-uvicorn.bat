@@ -1,11 +1,11 @@
 @echo off
 setlocal
-cd /d C:\apps\skyline-fusion-api
+cd /d C:\apps\wpc-demo
 
 REM Ensure .env is loaded by your config module; if not, uncomment next line:
 REM call .venv\Scripts\activate && python -c "import dotenv; dotenv.load_dotenv()"
 
-call .venv\Scripts\activate
+call api\.venv\Scripts\activate
 
 REM Workers: 2 is fine to start. Add --proxy-headers for IIS/ARR.
 uvicorn api.main:app ^
